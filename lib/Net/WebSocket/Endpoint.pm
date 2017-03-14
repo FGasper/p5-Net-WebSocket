@@ -28,6 +28,14 @@ sub new {
     return bless $self, $class;
 }
 
+#To facilitate chunking.
+sub set_data_handler {
+    my ($self, $todo_cr) = @_;
+    $self->{'_on_data'} = $todo_cr;
+
+    return;
+}
+
 sub get_next_message {
     my ($self) = @_;
 
@@ -35,45 +43,22 @@ sub get_next_message {
 
     if ( my $frame = $self->{'_parser'}->get_next_frame() ) {
         if ($frame->is_control_frame()) {
-            if ($frame->get_type() eq 'close') {
-                my $rframe = $self->{'_serializer'}->create_close(
-                    $frame->get_code_and_reason(),
-                );
-
-                local $SIG{'PIPE'} = 'IGNORE';
-
-                syswrite(
-                    $self->{'_out'},
-                    $rframe->to_bytes(),
-                );
-
-                $self->{'_closed'} = 1;
-
-                die Net::WebSocket::X->create('ReceivedClose', $frame);
-            }
-            elsif ($frame->get_type() eq 'ping') {
-                syswrite(
-                    $self->{'_out'},
-                    $self->{'_serializer'}->create_pong(
-                        $frame->get_payload(),
-                    )->to_bytes(),
-                );
-            }
-            elsif ($frame->get_type() eq 'pong') {
-                $self->{'_sent_pings'}--;
-            }
-            else {
-                die "Unrecognized control frame ($frame)";
-            }
-        }
-        elsif (!$frame->get_fin()) {
-            push @{ $self->{'_fragments'} }, $frame;
+            $self->_handle_control_frame($frame);
         }
         else {
-            return Net::WebSocket::Message::create_from_frames(
-                splice( @{ $self->{'_fragments'} } ),
-                $frame,
-            );
+            if ($self->{'_on_data'}) {
+                $self->{'_on_data'}->($frame);
+            }
+
+            if (!$frame->get_fin()) {
+                push @{ $self->{'_fragments'} }, $frame;
+            }
+            else {
+                return Net::WebSocket::Message::create_from_frames(
+                    splice( @{ $self->{'_fragments'} } ),
+                    $frame,
+                );
+            }
         }
     }
 
@@ -102,6 +87,45 @@ sub timeout {
 sub is_closed {
     my ($self) = @_;
     return $self->{'_closed'} ? 1 : 0;
+}
+
+#----------------------------------------------------------------------
+
+sub _handle_control_frame {
+    my ($self, $frame) = @_;
+
+    if ($frame->get_type() eq 'close') {
+        my $rframe = $self->{'_serializer'}->create_close(
+            $frame->get_code_and_reason(),
+        );
+
+        local $SIG{'PIPE'} = 'IGNORE';
+
+        syswrite(
+            $self->{'_out'},
+            $rframe->to_bytes(),
+        );
+
+        $self->{'_closed'} = 1;
+
+        die Net::WebSocket::X->create('ReceivedClose', $frame);
+    }
+    elsif ($frame->get_type() eq 'ping') {
+        syswrite(
+            $self->{'_out'},
+            $self->{'_serializer'}->create_pong(
+                $frame->get_payload(),
+            )->to_bytes(),
+        );
+    }
+    elsif ($frame->get_type() eq 'pong') {
+        $self->{'_sent_pings'}--;
+    }
+    else {
+        die "Unrecognized control frame ($frame)";
+    }
+
+    return;
 }
 
 1;

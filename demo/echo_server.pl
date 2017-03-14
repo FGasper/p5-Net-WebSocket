@@ -4,6 +4,8 @@ use strict;
 use warnings;
 use autodie;
 
+use Try::Tiny;
+
 use HTTP::Request ();
 use IO::Socket::INET ();
 use IO::Select ();
@@ -11,14 +13,13 @@ use IO::Select ();
 use FindBin;
 use lib "$FindBin::Bin/../lib";
 
+use Net::WebSocket::Endpoint ();
 use Net::WebSocket::Frame::text ();
 use Net::WebSocket::Frame::binary ();
 use Net::WebSocket::Frame::continuation ();
-use Net::WebSocket::Frame::close ();
-use Net::WebSocket::Frame::ping ();
-use Net::WebSocket::Frame::pong ();
 use Net::WebSocket::Handshake::Server ();
 use Net::WebSocket::ParseFilehandle ();
+use Net::WebSocket::Serializer::Server ();
 
 my $host_port = $ARGV[0] || die "Need host:port or port!\n";
 
@@ -50,55 +51,49 @@ while ( my $sock = $server->accept() ) {
 
     my $sent_ping;
 
-    while (1) {
-        #print STDERR "SELECT $$\n";
+    my $ept = Net::WebSocket::Endpoint->new(
+        serializer => 'Net::WebSocket::Serializer::Server',
+        parser => $parser,
+        out => $sock,
+    );
 
-        #my @ready = $s->can_read(10);
+    $ept->set_data_handler( sub {
+        my ($frame) = @_;
+
+        my $answer = 'Net::WebSocket::Frame::' . $frame->get_type();
+        $answer = $answer->new(
+            fin => $frame->get_fin(),
+            rsv => $frame->get_rsv(),
+            payload_sr => \$frame->get_payload(),
+        );
+
+        syswrite( $sock, $answer->to_bytes() );
+    } );
+
+    while (!$ept->is_closed()) {
         my ( $rdrs_ar, undef, $errs_ar ) = IO::Select->select( $s, undef, $s, 10 );
 
+        if ($errs_ar && @$errs_ar) {
+            $s->remove($sock);
+            last;
+        }
+
         if (!$rdrs_ar && !$errs_ar) {
-            #print STDERR "10 SECONDS WITH NO INPUT\n";
-            if ($sent_ping) {
-                #print STDERR "ALREADY SENT PING\n";
-                warn "No respose to ping!";
-                my $close = Net::WebSocket::Frame::close->new( code => 'POLICY_VIOLATION' );
-                print {$sock} $close->to_bytes();
-                close $sock;
-                last;
-            }
-
-            #print STDERR "SENDING PING\n";
-            my $ping = Net::WebSocket::Frame::ping->new( payload_sr => \'Hello??' );
-            print {$sock} $ping->to_bytes() or die $!;
-
-            $sent_ping = 1;
-            #print STDERR "SENT PING\n";
+            $ept->timeout();
+            last if $ept->is_closed();
             next;
         }
 
         if ( $rdrs_ar ) {
-            if ( my $frame = $parser->get_next_frame() ) {
-                if ($frame->is_control_frame()) {
-                    _handle_control_frame($frame, $sock);
-
-                    last if $frame->get_type() eq 'close';
-
-                    if ($frame->get_type() eq 'pong') {
-#print STDERR "Got pong\n";
-                        $sent_ping = 0;
-                    }
-                }
-                else {
-                    my $answer = 'Net::WebSocket::Frame::' . $frame->get_type();
-                    $answer = $answer->new(
-                        fin => $frame->get_fin(),
-                        rsv => $frame->get_rsv(),
-                        payload_sr => \$frame->get_payload(),
-                    );
-
-                    print {$sock} $answer->to_bytes() or die $!;
-                }
+            try {
+                $ept->get_next_message();
             }
+            catch {
+                if (!try { $_->isa('Net::WebSocket::X::ReceivedClose') } ) {
+                    local $@ = $_;
+                    die;
+                }
+            };
         }
     }
 
@@ -155,9 +150,7 @@ sub _set_sig {
 
             my $code = ($the_sig eq 'INT') ? 'ENDPOINT_UNAVAILABLE' : 'SERVER_ERROR';
 
-            my $frame = Net::WebSocket::Frame::close->new(
-                code => $code,
-            );
+            my $frame = Net::WebSocket::Serializer::Server->create_close($code);
 
             syswrite( $inet, $frame->to_bytes() );
 
@@ -165,25 +158,6 @@ sub _set_sig {
 
             kill $the_sig, $$;
         };
-    }
-
-    return;
-}
-
-sub _handle_control_frame {
-    my ($frame, $out_fh) = @_;
-
-    if ($frame->get_type() eq 'close') {
-        syswrite( $out_fh, Net::WebSocket::Frame::close->new(
-            payload_sr => \$frame->get_payload(),
-        )->to_bytes() );
-
-        my ($code, $reason) = $frame->get_code_and_reason();
-    }
-    elsif ($frame->get_type() eq 'ping') {
-        syswrite( $out_fh, Net::WebSocket::Frame::pong->new(
-            payload_sr => \$frame->get_payload(),
-        )->to_bytes() );
     }
 
     return;
