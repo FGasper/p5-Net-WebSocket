@@ -46,7 +46,15 @@ sub _read {
     local $!;
 
     sysread( $self->{'_fh'}, $buf, $len, length $buf ) or do {
-        die Net::WebSocket::X->create('ReadFilehandle', $!) if $!;
+
+        #If “_reading_frame” is set, then we’re in the middle of reading
+        #a frame, in which context we don’t want to die() on EAGAIN because
+        #we accept the risk of incomplete reads there in exchange for
+        #speed and simplicity. (Most of the time a full frame should indeed
+        #be ready anyway.)
+        if (!$self->{'_reading_frame'} || !$!{'EAGAIN'}) {
+            die Net::WebSocket::X->create('ReadFilehandle', $!) if $!;
+        }
     };
 
     return $buf;

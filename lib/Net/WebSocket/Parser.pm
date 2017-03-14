@@ -17,7 +17,23 @@ sub get_next_frame {
 
     my $buffer = q<>;
 
-    my $first2 = $self->_read_with_buffer(0, 2) or return undef;
+    #It is really, really inconvenient that Perl has no “or” operator
+    #that considers q<> falsey but '0' truthy. :-/
+    #That aside, if indeed all we read is '0', then we know that’s not
+    #enough, and we can return.
+    my $first2 = $self->_read_with_buffer(0, 2);
+    return undef if length($first2) < 2;
+
+    #Now that we’ve read our header bytes, we’ll read some more.
+    #There may not actually be anything to read, though, in which case
+    #some readers will error (e.g., EAGAIN from a non-blocking filehandle).
+    #From a certain ideal we’d return #on each individual read to allow
+    #the reader to wait until there is more data ready; however, for
+    #practicality (and speed) let’s go ahead and try to read the rest of
+    #the frame. That means we need to set some flag to let the reader know
+    #not to die() if there’s no more data currently, as we’re probably
+    #expecting more soon to complete the frame.
+    local $self->{'_reading_frame'} = 1;
 
     my $oct2 = unpack('xC', $first2 );
 
@@ -30,7 +46,8 @@ sub get_next_frame {
     my ($longs, $long);
 
     if ($len_len) {
-        my $len_buf = $self->_read_with_buffer(2, $len_len) or return undef;
+        my $len_buf = $self->_read_with_buffer(2, $len_len);
+        return undef if length($len_buf) < 2;
 
         if ($len_len == 2) {
             ($longs, $long) = ( 0, unpack('n', $len_buf) );
@@ -43,7 +60,14 @@ sub get_next_frame {
         ($longs, $long) = ( 0, $len );
     }
 
-    my $mask_buf = $mask_size ? ($self->_read_with_buffer(2 + $len_len, $mask_size) || return undef) : q<>;
+    my $mask_buf;
+    if ($mask_size) {
+        $mask_buf = $self->_read_with_buffer(2 + $len_len, $mask_size);
+        return undef if length($mask_buf) < $mask_size;
+    }
+    else {
+        $mask_buf = q<>;
+    }
 
     my $payload = q<>;
 
@@ -61,6 +85,12 @@ sub get_next_frame {
     $self->{'_buffer'} = q<>;
 
     return Net::WebSocket::Frame::create_from_parse(\$first2, \$len_len, \$mask_buf, \$payload);
+}
+
+sub has_partial_frame {
+    my ($self) = @_;
+
+    return length($self->{'_buffer'}) ? 1 : 0;
 }
 
 #This will only return exactly the number of bytes requested.
