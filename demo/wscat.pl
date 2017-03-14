@@ -4,15 +4,11 @@ use strict;
 use warnings;
 use autodie;
 
-package main;
-
 use Try::Tiny;
 
-use Digest::SHA ();
 use HTTP::Response;
 use IO::Select ();
 use IO::Socket::INET ();
-use MIME::Base64 ();
 use Socket ();
 use URI::Split ();
 
