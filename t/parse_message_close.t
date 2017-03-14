@@ -10,8 +10,6 @@ plan tests => 3;
 
 use Net::WebSocket::ParseString;
 
-use Carp::Always;
-
 my @tests = (
     [
         "\x88\x00",
@@ -19,7 +17,7 @@ my @tests = (
             cmp_deeply(
                 $_,
                 all(
-                    Isa('Net::WebSocket::Frame::close'),
+                    Isa('Net::WebSocket::Frame'),
                     methods(
                         get_type => 'close',
                         get_payload => "",
@@ -38,7 +36,7 @@ my @tests = (
             cmp_deeply(
                 $_,
                 all(
-                    Isa('Net::WebSocket::Frame::close'),
+                    Isa('Net::WebSocket::Frame'),
                     methods(
                         get_type => 'close',
                         get_payload => "\x03\xea",
@@ -57,7 +55,7 @@ my @tests = (
             cmp_deeply(
                 $_,
                 all(
-                    Isa('Net::WebSocket::Frame::close'),
+                    Isa('Net::WebSocket::Frame'),
                     methods(
                         get_type => 'close',
                         get_payload => "\x03\xeaGoodbye\x0a",
@@ -77,7 +75,7 @@ my $parser = Net::WebSocket::ParseString->new( \$full_buffer );
 
 for my $t (@tests) {
 
-    eval { $parser->get_next_message( sub {} ); };
+    my $frame = $parser->get_next_frame();
 
-    $t->[1]->() for $@->get('frame');
+    $t->[1]->() for $frame;
 }

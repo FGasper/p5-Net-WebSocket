@@ -12,7 +12,7 @@ sub new {
     my ($class, %opts) = @_;
 
     my @missing = grep { !length $opts{$_} } qw( parser serializer out );
-    die "Missing: [@missing]" if @missing;
+    #die "Missing: [@missing]" if @missing;
 
     my $self = {
         _sent_pings => 0,
@@ -70,14 +70,14 @@ sub timeout {
 
     if ($self->{'_sent_pings'} == $self->{'_max_pings'}) {
         my $close = $self->{'_serializer'}->create_close('POLICY_VIOLATION');
-        syswrite( $self->{'_out'}, $close->to_bytes() );
+        print { $self->{'_out'} } $close->to_bytes();
         $self->{'_closed'} = 1;
     }
 
     my $ping = $self->{'_serializer'}->create_ping(
         payload_sr => \"$self->{'_sent_pings'} of $self->{'_max_pings'}",
     );
-    syswrite( $self->{'_out'}, $ping->to_bytes() );
+    print { $self->{'_out'} } $ping->to_bytes();
 
     $self->{'_sent_pings'}++;
 
@@ -101,25 +101,35 @@ sub _handle_control_frame {
 
         local $SIG{'PIPE'} = 'IGNORE';
 
-        syswrite(
-            $self->{'_out'},
-            $rframe->to_bytes(),
-        );
+        print { $self->{'_out'} } $rframe->to_bytes();
 
         $self->{'_closed'} = 1;
 
         die Net::WebSocket::X->create('ReceivedClose', $frame);
     }
     elsif ($frame->get_type() eq 'ping') {
-        syswrite(
-            $self->{'_out'},
-            $self->{'_serializer'}->create_pong(
-                $frame->get_payload(),
-            )->to_bytes(),
+        my $pong = $self->{'_serializer'}->create_pong(
+            $frame->get_payload(),
         );
+
+        print { $self->{'_out'} } $pong->to_bytes();
     }
     elsif ($frame->get_type() eq 'pong') {
-        $self->{'_sent_pings'}--;
+        if ($self->{'_sent_pings'}) {
+            $self->{'_sent_pings'}--;
+        }
+        else {
+            my $cframe = $self->{'_serializer'}->create_close(
+                'PROTOCOL_ERROR',
+                'pong without ping',
+            );
+
+            print { $self->{'_out'} } $cframe->to_bytes();
+
+            $self->{'_closed'} = 1;
+
+            die sprintf("pong (%s) without ping", $frame->get_payload());
+        }
     }
     else {
         die "Unrecognized control frame ($frame)";

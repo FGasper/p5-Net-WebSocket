@@ -39,6 +39,8 @@ my $server = IO::Socket::INET->new(
 while ( my $sock = $server->accept() ) {
     fork and next;
 
+    $sock->autoflush(1);
+
     _handshake_as_server($sock);
 
     _set_sig($sock);
@@ -67,7 +69,7 @@ while ( my $sock = $server->accept() ) {
             payload_sr => \$frame->get_payload(),
         );
 
-        syswrite( $sock, $answer->to_bytes() );
+        print { $sock } $answer->to_bytes();
     } );
 
     while (!$ept->is_closed()) {
@@ -135,12 +137,13 @@ sub _handshake_as_server {
         key => $key,
     );
 
-    syswrite $inet, $handshake->create_header_text() . CRLF;
+    print { $inet } $handshake->create_header_text() . CRLF;
 
     return;
 }
 
-use constant ERROR_SIGS => qw( INT HUP QUIT ABRT USR1 USR2 SEGV PIPE ALRM TERM );
+use constant ERROR_SIGS => qw( INT HUP QUIT ABRT USR1 USR2 SEGV ALRM TERM );
+
 sub _set_sig {
     my ($inet) = @_;
 
@@ -152,7 +155,7 @@ sub _set_sig {
 
             my $frame = Net::WebSocket::Serializer::Server->create_close($code);
 
-            syswrite( $inet, $frame->to_bytes() );
+            print { $inet } $frame->to_bytes();
 
             $SIG{$the_sig} = 'DEFAULT';
 

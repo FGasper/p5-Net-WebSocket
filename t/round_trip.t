@@ -12,7 +12,7 @@ plan tests => 1;
 
 use Net::WebSocket::ParseFilehandle ();
 
-my $start = 'We have come to dedicate a portion of that field as a final resting-place to those who here gave their lives that that nation might live. It is altogether fitting and proper that we should do this; yet, in a larger sense, we cannot dedicate, we cannot consecrate, we cannot hallow this ground. The brave men, living and dead, who struggled here have consecrated it far beyond our poor power to add or detract.';
+my $start = 'We have come to dedicate a portion of that field as a final resting-place to those who here gave their lives that that nation might live. It is altogether fitting and proper that we should do this; yet, in a larger sense, we cannot dedicate, we cannot consecrate, we cannot hallow this ground. The brave men, living and dead, who struggled here have consecrated it far beyond our poor power to add or detract. The world will little note …';
 
 my $start_copy = $start;
 
@@ -31,7 +31,7 @@ my $parse = Net::WebSocket::ParseFilehandle->new( $rdr );
 
 my $received = q<>;
 
-while ( my $msg = $parse->get_next_message() ) {
+while ( my $msg = $parse->get_next_frame() ) {
     $received .= $msg->get_payload();
 }
 

@@ -6,13 +6,15 @@ use warnings;
 use Test::More;
 use Test::Deep;
 
-plan tests => 7;
+plan tests => 6;
 
-use Net::WebSocket::ParseString;
+use Net::WebSocket::Endpoint ();
+use Net::WebSocket::ParseString ();
+use Net::WebSocket::Serializer::Server ();
 
-use Carp::Always;
+my $out_buffer = q<>;
 
-my @control_frames;
+my $out_parser = Net::WebSocket::ParseString->new( \$out_buffer );
 
 my @tests = (
     [
@@ -51,31 +53,15 @@ my @tests = (
         "\x89\x0bHello-ping\x0a" . "\x82\x00",
         sub {
             cmp_deeply(
-                $control_frames[0],
+                $out_parser->get_next_frame(),
                 all(
-                    Isa('Net::WebSocket::Frame::ping'),
+                    Isa('Net::WebSocket::Frame'),
                     methods(
-                        get_type => 'ping',
+                        get_type => 'pong',
                         get_payload => "Hello-ping\x0a",
                     ),
                 ),
                 'hello - ping',
-            ) or diag explain $_;
-        },
-    ],
-    [
-        "\x8a\x0bHello-pong\x0a" . "\x82\x00",
-        sub {
-            cmp_deeply(
-                $control_frames[0],
-                all(
-                    Isa('Net::WebSocket::Frame::pong'),
-                    methods(
-                        get_type => 'pong',
-                        get_payload => "Hello-pong\x0a",
-                    ),
-                ),
-                'hello - pong',
             ) or diag explain $_;
         },
     ],
@@ -110,22 +96,22 @@ my @tests = (
                 'fragmented double hello with ping in the middle',
             ) or diag explain $_;
 
+            my $resp = $out_parser->get_next_frame();
+
             cmp_deeply(
-                \@control_frames,
-                [
-                    all(
-                        Isa('Net::WebSocket::Frame'),
-                        methods(
-                            get_type => 'ping',
-                            get_payload => q<>,
-                            get_fin => 1,
-                            is_control_frame => 1,
-                            get_mask_bytes => q<>,
-                        ),
+                $resp,
+                all(
+                    Isa('Net::WebSocket::Frame'),
+                    methods(
+                        get_type => 'pong',
+                        get_payload => q<>,
+                        get_fin => 1,
+                        is_control_frame => 1,
+                        get_mask_bytes => q<>,
                     ),
-                ],
+                ),
                 'ping in the middle comes out as expected',
-            );
+            ) or diag explain [$resp, sprintf( "%v.02x", $out_buffer )];
         },
     ],
 );
@@ -133,10 +119,23 @@ my @tests = (
 my $full_buffer = join( q<>, map { $_->[0] } @tests );
 my $parser = Net::WebSocket::ParseString->new( \$full_buffer );
 
-for my $t (@tests) {
-    @control_frames = ();
+open my $out_fh, '>>', \$out_buffer;
 
-    my $msg = $parser->get_next_message( sub { push @control_frames, @_; } );
+my $ept = Net::WebSocket::Endpoint->new(
+    parser => $parser,
+    serializer => 'Net::WebSocket::Serializer::Server',
+    out => $out_fh,
+);
+
+for my $t (@tests) {
+    substr( $out_buffer, 0 ) = q<>;
+
+    my $msg;
+
+    while (1) {
+        $msg = $ept->get_next_message();
+        last if $msg;
+    }
 
     $t->[1]->() for $msg;
 }

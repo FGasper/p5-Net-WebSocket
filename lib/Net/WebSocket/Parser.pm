@@ -76,9 +76,6 @@ sub _read_with_buffer {
 
         if (length($return) < $length) {
             if (length $return) {
-use Data::Dumper;
-$Data::Dumper::Useqq = 1;
-print Dumper( 'incomplete', $self->{'_buffer'}, $buffer_start, $return );
                 substr( $self->{'_buffer'}, $buffer_start ) = $return;
             }
 
