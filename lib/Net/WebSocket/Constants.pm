@@ -23,8 +23,8 @@ use constant STATUS => {
     INVALID_DATA_TYPE      => 1003,
 
     #These are never actually sent.
-    EMPTY_CLOSE            => 1005,
-    ABORTED_CLOSE          => 1006,
+    #EMPTY_CLOSE            => 1005,
+    #ABORTED_CLOSE          => 1006,
 
     INVALID_PAYLOAD        => 1007,
     POLICY_VIOLATION       => 1008,
@@ -34,7 +34,7 @@ use constant STATUS => {
 
     #RFC says not to use this one,
     #but MS has it in their enum.
-    SECURE_HANDSHAKE_ERROR => 1015,
+    #SECURE_HANDSHAKE_ERROR => 1015,
 };
 
 #----------------------------------------------------------------------
