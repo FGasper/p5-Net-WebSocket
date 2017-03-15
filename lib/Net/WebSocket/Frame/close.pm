@@ -82,29 +82,7 @@ use parent qw(
 
 use Call::Context ();
 
-#These names are taken from:
-#https://msdn.microsoft.com/en-us/library/windows/desktop/hh449350(v=vs.85).aspx
-#NB: accessed in tests
-our %DEFINED_STATUS_CODES = (
-    SUCCESS                => 1000,
-    ENDPOINT_UNAVAILABLE   => 1001,
-    PROTOCOL_ERROR         => 1002,
-    INVALID_DATA_TYPE      => 1003,
-
-    #These are never actually sent.
-    EMPTY_CLOSE            => 1005,
-    ABORTED_CLOSE          => 1006,
-
-    INVALID_PAYLOAD        => 1007,
-    POLICY_VIOLATION       => 1008,
-    MESSAGE_TOO_BIG        => 1009,
-    UNSUPPORTED_EXTENSIONS => 1010,
-    SERVER_ERROR           => 1011,
-
-    #RFC says not to use this one,
-    #but MS has it in their enum.
-    SECURE_HANDSHAKE_ERROR => 1015,
-);
+use Net::WebSocket::Constants ();
 
 sub new {
     my ($class, %opts) = @_;
@@ -113,7 +91,7 @@ sub new {
         my $payload;
 
         if ($opts{'code'}) {
-            my $num = $DEFINED_STATUS_CODES{$opts{'code'}};
+            my $num = Net::WebSocket::Constants::status_name_to_code($opts{'code'});
             if (!$num) {
                 $num = $opts{'code'};
 
@@ -121,7 +99,7 @@ sub new {
                     die "Invalid WebSocket status code: [$num]";
                 }
 
-                if ( !grep { $_ == $num } values %DEFINED_STATUS_CODES ) {
+                if ( !Net::WebSocket::Constants::status_code_to_name($num) ) {
                     if ( $num < 4000 || $num > 4999 ) {
                         die "Disallowed WebSocket status code: [$num]";
                     }

@@ -15,7 +15,7 @@ use URI::Split ();
 use FindBin;
 use lib "$FindBin::Bin/../lib";
 
-use Net::WebSocket::Endpoint ();
+use Net::WebSocket::Endpoint::Client ();
 use Net::WebSocket::Handshake::Client ();
 use Net::WebSocket::ParseFilehandle ();
 use Net::WebSocket::SerializeFilehandle::Client ();
@@ -134,13 +134,18 @@ sub _mux_after_handshake {
         $buf,
     );
 
+    my $ept = Net::WebSocket::Endpoint::Client->new(
+        out => $inet,
+        parser => $parser,
+    );
+
     for my $sig (ERROR_SIGS()) {
         $SIG{$sig} = sub {
             my ($the_sig) = @_;
 
             my $code = ($the_sig eq 'INT') ? 'SUCCESS' : 'ENDPOINT_UNAVAILABLE';
 
-            my $frame = $serializer->create_close($code);
+            my $frame = $ept->create_close($code);
 
             syswrite( $inet, $frame->to_bytes() );
 
@@ -149,12 +154,6 @@ sub _mux_after_handshake {
             kill $the_sig, $$;
         };
     }
-
-    my $ept = Net::WebSocket::Endpoint->new(
-        out => $inet,
-        parser => $parser,
-        serializer => $serializer,
-    );
 
     if ( -t $from_caller ) {
         $_->blocking(0) for ($from_caller, $inet);
@@ -201,7 +200,7 @@ sub _mux_after_handshake {
     else {
         _chunk_to_remote($serializer, $inet);
 
-        my $close_frame = $serializer->create_close('SUCCESS');
+        my $close_frame = $ept->create_close('SUCCESS');
 
         syswrite( $inet, $close_frame->to_bytes() );
 

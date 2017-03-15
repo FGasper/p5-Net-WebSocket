@@ -6,9 +6,9 @@ use warnings;
 use parent qw( Net::WebSocket::SerializerBase );
 
 sub new {
-    my ($class) = @_;
+    my ($class, $type) = @_;
 
-    my $frame_class = $class->_load_frame_class( $class->TYPE() );
+    my $frame_class = $class->_load_frame_class($type);
 
     return bless \$frame_class, $class;
 }
@@ -19,13 +19,13 @@ sub create_chunk {
     my $frame = $$self->new(
         fin => 0,
         mask => $self->_create_new_mask(),
-        payload_sr = \$_[0],
+        payload_sr => \$_[0],
     );
 
     #The first $frame we create needs to be text/binary, but all
     #subsequent ones must be continuation.
     if (!$frame->isa('Net::WebSocket::Frame::continuation')) {
-        substr( $$self, 1 + rindex(':') ) = 'continuation';
+        substr( $$self, 1 + rindex($$self, ':') ) = 'continuation';
     }
 
     return $frame;
@@ -39,7 +39,7 @@ sub create_final {
     my $frame = $$self->new(
         fin => 1,
         mask => $self->_create_new_mask(),
-        payload_sr = \$_[0],
+        payload_sr => \$_[0],
     );
 
     substr( $$self, 0 ) = FINISHED_INDICATOR();

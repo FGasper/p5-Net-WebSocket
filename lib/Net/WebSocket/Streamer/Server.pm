@@ -1,10 +1,10 @@
-package Net::WebSocket::Serializer::Server;
+package Net::WebSocket::Streamer::Server;
 
 use strict;
 use warnings;
 
 use parent qw(
-    Net::WebSocket::Serializer
+    Net::WebSocket::Streamer
     Net::WebSocket::Masker::Server
 );
 

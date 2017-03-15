@@ -11,7 +11,7 @@ use constant DEFAULT_MAX_PINGS => 2;
 sub new {
     my ($class, %opts) = @_;
 
-    my @missing = grep { !length $opts{$_} } qw( parser serializer out );
+    my @missing = grep { !length $opts{$_} } qw( parser out );
     #die "Missing: [@missing]" if @missing;
 
     my $self = {
@@ -19,7 +19,6 @@ sub new {
         _max_pings => DEFAULT_MAX_PINGS,
         (map { ( "_$_" => $opts{$_} ) } qw(
             parser
-            serializer
             out
             max_pings
         )),
@@ -69,12 +68,12 @@ sub timeout {
     my ($self) = @_;
 
     if ($self->{'_sent_pings'} == $self->{'_max_pings'}) {
-        my $close = $self->{'_serializer'}->create_close('POLICY_VIOLATION');
+        my $close = $self->create_close('POLICY_VIOLATION');
         print { $self->{'_out'} } $close->to_bytes();
         $self->{'_closed'} = 1;
     }
 
-    my $ping = $self->{'_serializer'}->create_ping(
+    my $ping = $self->create_ping(
         payload_sr => \"$self->{'_sent_pings'} of $self->{'_max_pings'}",
     );
     print { $self->{'_out'} } $ping->to_bytes();
@@ -95,7 +94,7 @@ sub _handle_control_frame {
     my ($self, $frame) = @_;
 
     if ($frame->get_type() eq 'close') {
-        my $rframe = $self->{'_serializer'}->create_close(
+        my $rframe = $self->create_close(
             $frame->get_code_and_reason(),
         );
 
@@ -108,7 +107,7 @@ sub _handle_control_frame {
         die Net::WebSocket::X->create('ReceivedClose', $frame);
     }
     elsif ($frame->get_type() eq 'ping') {
-        my $pong = $self->{'_serializer'}->create_pong(
+        my $pong = $self->create_pong(
             $frame->get_payload(),
         );
 
@@ -119,7 +118,7 @@ sub _handle_control_frame {
             $self->{'_sent_pings'}--;
         }
         else {
-            my $cframe = $self->{'_serializer'}->create_close(
+            my $cframe = $self->create_close(
                 'PROTOCOL_ERROR',
                 'pong without ping',
             );

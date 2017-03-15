@@ -17,11 +17,8 @@ use lib "$FindBin::Bin/lib";
 use NWDemo ();
 
 use Net::WebSocket::Endpoint::Server ();
-use Net::WebSocket::Frame::text ();
-use Net::WebSocket::Frame::binary ();
-use Net::WebSocket::Frame::continuation ();
-use Net::WebSocket::Handshake::Server ();
 use Net::WebSocket::ParseFilehandle ();
+use Net::WebSocket::Streamer::Server ();
 
 my $host_port = $ARGV[0] || die "Need host:port or port!\n";
 
@@ -60,36 +57,37 @@ while ( my $sock = $server->accept() ) {
         out => $sock,
     );
 
-    $ept->set_data_handler( sub {
-        my ($frame) = @_;
+    my $streamer = Net::WebSocket::Streamer::Server->new('text');
 
-        my $answer = 'Net::WebSocket::Frame::' . $frame->get_type();
-        $answer = $answer->new(
-            fin => $frame->get_fin(),
-            rsv => $frame->get_rsv(),
-            payload_sr => \$frame->get_payload(),
-        );
-
-        print { $sock } $answer->to_bytes();
-    } );
+    my $cur_number = 0;
 
     while (!$ept->is_closed()) {
-        my ( $rdrs_ar, undef, $errs_ar ) = IO::Select->select( $s, undef, $s, 10 );
+        my ( $rdrs_ar, $s, $errs_ar ) = IO::Select->select( $s, $s, $s, 1 );
+
+        my $is_final = ($cur_number == 2);
+
+        my $method = $is_final ? 'create_final' : 'create_chunk';
+
+        syswrite(
+            $sock,
+            $streamer->$method($cur_number)->to_bytes(),
+        );
+
+        $cur_number++;
+        $cur_number %= 3;
+
+        if ($is_final) {
+            $streamer = Net::WebSocket::Streamer::Server->new('text');
+        }
 
         if ($errs_ar && @$errs_ar) {
             $s->remove($sock);
             last;
         }
 
-        if (!$rdrs_ar && !$errs_ar) {
-            $ept->timeout();
-            last if $ept->is_closed();
-            next;
-        }
-
-        if ( $rdrs_ar ) {
+        if ( $rdrs_ar && @$rdrs_ar ) {
             try {
-                $ept->get_next_message();
+                $ept->get_next_message();   #we don’t care what it is
             }
             catch {
                 if (!try { $_->isa('Net::WebSocket::X::ReceivedClose') } ) {
@@ -98,6 +96,8 @@ while ( my $sock = $server->accept() ) {
                 }
             };
         }
+
+        sleep 1;
     }
 
     exit;
