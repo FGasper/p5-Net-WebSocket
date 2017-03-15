@@ -15,14 +15,11 @@ sub get_next_frame {
         $self->{'_buffer'} = q<>;
     }
 
-    my $buffer = q<>;
-
     #It is really, really inconvenient that Perl has no “or” operator
     #that considers q<> falsey but '0' truthy. :-/
     #That aside, if indeed all we read is '0', then we know that’s not
     #enough, and we can return.
-    my $first2 = $self->_read_with_buffer(0, 2);
-    return undef if length($first2) < 2;
+    my $first2 = $self->_read_with_buffer(2) or return undef;
 
     #Now that we’ve read our header bytes, we’ll read some more.
     #There may not actually be anything to read, though, in which case
@@ -41,13 +38,16 @@ sub get_next_frame {
 
     my $mask_size = ($oct2 & 0x80) && 4;
 
-    my $len_len = ($len == 126) ? 2 : ($len == 127) ? 8 : 0;
+    my $len_len = ($len == 0x7e) ? 2 : ($len == 0x7f) ? 8 : 0;
+    my $len_buf = q<>;
 
     my ($longs, $long);
 
     if ($len_len) {
-        my $len_buf = $self->_read_with_buffer(2, $len_len);
-        return undef if length($len_buf) < 2;
+        $len_buf = $self->_read_with_buffer($len_len) or do {
+            substr( $self->{'_buffer'}, 0, 0, $first2 );
+            return undef;
+        };
 
         if ($len_len == 2) {
             ($longs, $long) = ( 0, unpack('n', $len_buf) );
@@ -62,8 +62,10 @@ sub get_next_frame {
 
     my $mask_buf;
     if ($mask_size) {
-        $mask_buf = $self->_read_with_buffer(2 + $len_len, $mask_size);
-        return undef if length($mask_buf) < $mask_size;
+        $mask_buf = $self->_read_with_buffer($mask_size) or do {
+            substr( $self->{'_buffer'}, 0, 0, $first2 . $len_buf );
+            return undef;
+        };
     }
     else {
         $mask_buf = q<>;
@@ -71,15 +73,25 @@ sub get_next_frame {
 
     my $payload = q<>;
 
-    my $pos = 2 + $len_len + $mask_size;
-
     for ( 1 .. $longs ) {
-        $self->_append_chunk( \$pos, 2**31, \$payload ) or return undef;
-        $self->_append_chunk( \$pos, 2**31, \$payload ) or return undef;
+syswrite( \*STDERR, "long" . length($self->{'_buffer'}) . "\n" );
+
+        #32-bit systems don’t know what 2**32 is.
+        #MacOS, at least, also chokes on 2**31 (Is their size_t signed??),
+        #even on 64-bit.
+        for ( 1 .. 4 ) {
+            $self->_append_chunk( 2**30, \$payload ) or do {
+                substr( $self->{'_buffer'}, 0, 0, $first2 . $len_buf . $mask_buf . $payload );
+                return undef;
+            };
+        }
     }
 
     if ($long) {
-        $self->_append_chunk( \$pos, $long, \$payload ) or return undef;
+        $self->_append_chunk( $long, \$payload ) or do {
+            substr( $self->{'_buffer'}, 0, 0, $first2 . $len_buf . $mask_buf . $payload );
+            return undef;
+        };
     }
 
     $self->{'_buffer'} = q<>;
@@ -96,46 +108,27 @@ sub has_partial_frame {
 #This will only return exactly the number of bytes requested.
 #If fewer than we want are available, then we return undef.
 sub _read_with_buffer {
-    my ($self, $buffer_start, $length) = @_;
+    my ($self, $length) = @_;
 
-    my $return;
+    #Prioritize the case where we read everything we need.
 
-    #Buffer has nothing to help us
-    if (length $self->{'_buffer'} <= $buffer_start) {
-        $return = $self->_read($length);
+    if ( length($self->{'_buffer'}) < $length ) {
+        my $deficit = $length - length($self->{'_buffer'});
+        my $read = $self->_read($deficit);
 
-        if (length($return) < $length) {
-            if (length $return) {
-                substr( $self->{'_buffer'}, $buffer_start ) = $return;
-            }
-
+        if (length($read) < $deficit) {
+            $self->{'_buffer'} .= $read;
             return undef;
         }
+
+        return substr($self->{'_buffer'}, 0, length($self->{'_buffer'}), q<>) . $read;
     }
 
-    #Buffer has something
-    else {
-        $return = substr( $self->{'_buffer'}, $buffer_start, $length );
-
-        #Buffer has only some things we need
-        if (length($return) < $length) {
-            my $deficit = $buffer_start + $length - length($self->{'_buffer'});
-            my $read = $self->_read($deficit);
-
-            if (length($read) < $deficit) {
-                $self->{'_buffer'} .= $read;
-                return undef;
-            }
-
-            $return .= $read;
-        }
-    }
-
-    return $return;
+    return substr( $self->{'_buffer'}, 0, $length, q<> );
 }
 
 sub _append_chunk {
-    my ($self, $pos_sr, $length, $buf_sr) = @_;
+    my ($self, $length, $buf_sr) = @_;
 
     my $start_buf_len = length $$buf_sr;
 
@@ -144,15 +137,13 @@ sub _append_chunk {
     while (1) {
         my $read_so_far = length($$buf_sr) - $start_buf_len;
 
-        $cur_buf = $self->_read_with_buffer($$pos_sr, $length - $read_so_far);
-        return undef if !length $cur_buf;
+        $cur_buf = $self->_read_with_buffer($length - $read_so_far);
+        return undef if !defined $cur_buf;
 
         $$buf_sr .= $cur_buf;
 
         last if (length($$buf_sr) - $start_buf_len) >= $length;
     }
-
-    $$pos_sr += $length;
 
     return 1;
 }

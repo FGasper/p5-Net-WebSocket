@@ -20,7 +20,10 @@ use warnings;
 
 use constant MAX_FRAGMENT_SIZE => 65535;
 
+use parent qw( Net::WebSocket::SerializerBase );
+
 use Net::WebSocket::Frame::continuation ();
+use Net::WebSocket::Message ();
 
 sub create_text {
     my ($self, $size) = @_;
@@ -46,51 +49,6 @@ sub flush_binary {
     return $self->_create('binary');
 }
 
-sub create_ping {
-    my ($self, $msg) = @_;
-
-    $msg = q<> if !defined $msg;
-
-    return $self->_create_control('ping', payload_sr => \$msg);
-}
-
-sub create_pong {
-    my ($self, $msg) = @_;
-
-    $msg = q<> if !defined $msg;
-
-    return $self->_create_control('pong', payload_sr => \$msg);
-}
-
-sub create_close {
-    my ($self, $code, $reason) = @_;
-
-    return $self->_create_control('close', code => $code, reason => $reason);
-}
-
-sub _prep_classes {
-    my ($type) = @_;
-
-    my $frame_class = "Net::WebSocket::Frame::$type";
-    my $msg_class = "Net::WebSocket::Message::$type";
-
-    for ( $frame_class, $msg_class ) {
-        Module::Load::load($_) if !$_->can('new');
-    }
-
-    return ($frame_class, $msg_class);
-}
-
-sub _create_control {
-    my ($self, $type, @args) = @_;
-
-    my ($frame_class, $msg_class) = _prep_classes($type);
-
-    return $frame_class->new(
-        mask => $self->_create_new_mask(),
-        @args,
-    );
-}
 
 sub _create {
     my ($self, $type, $size) = @_;
@@ -101,7 +59,7 @@ sub _create {
         }
     }
 
-    my ($frame_class) = _prep_classes($type);
+    my $frame_class = $self->_load_frame_class($type);
 
     my $mask = $self->_create_new_mask();
 
