@@ -141,8 +141,6 @@ use parent qw(
     Net::WebSocket::Endpoint
 );
 
-use Net::WebSocket::Serializer::Server ();
-
-use constant _SERIALIZER => 'Net::WebSocket::Serializer::Server';
+use constant FRAME_MASK_ARGS => ();
 
 1;

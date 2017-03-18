@@ -58,8 +58,7 @@ Note that L<Net::WebSocket::Parser> still won’t know how to handle such a
 custom frame, so if you intend to receive custom frames as part of messages,
 you’ll also need to create a custom base class of this class, then also
 subclass L<Net::WebSocket::Parser>. You may additionally want to subclass
-C<Net::WebSocket::Serializer::*>, and possibly C<Net::WebSocket::Streamer::*>,
-in order to expedite the creation of messages using your custom frame type.
+L<Net::WebSocket::Streamer::Server> (or -C<::Client>) if you do streaming.
 
 B<NOTE: THIS IS LARGELY UNTESTED.> I’m not familiar with any application that
 actually requires this feature. The C<permessage-deflate> extension seems to

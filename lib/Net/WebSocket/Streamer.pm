@@ -5,10 +5,14 @@ use warnings;
 
 use parent qw( Net::WebSocket::Base::Serializer );
 
+use constant FINISHED_INDICATOR => __PACKAGE__ . '::__ALREADY_SENT_FINAL';
+
 sub new {
     my ($class, $type) = @_;
 
     my $frame_class = $class->_load_frame_class($type);
+
+    #Store the frame class as the value of $$self.
 
     return bless \$frame_class, $class;
 }
@@ -30,8 +34,6 @@ sub create_chunk {
 
     return $frame;
 }
-
-use constant FINISHED_INDICATOR => __PACKAGE__ . '::__ALREADY_SENT_FINAL';
 
 sub create_final {
     my $self = shift;

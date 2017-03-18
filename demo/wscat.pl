@@ -16,9 +16,10 @@ use FindBin;
 use lib "$FindBin::Bin/../lib";
 
 use Net::WebSocket::Endpoint::Client ();
+use Net::WebSocket::Frame::binary ();
+use Net::WebSocket::Frame::close  ();
 use Net::WebSocket::Handshake::Client ();
 use Net::WebSocket::Parser ();
-use Net::WebSocket::Serializer::Client ();
 
 use constant MAX_CHUNK_SIZE => 64000;
 
@@ -141,7 +142,10 @@ sub _mux_after_handshake {
 
             my $code = ($the_sig eq 'INT') ? 'SUCCESS' : 'ENDPOINT_UNAVAILABLE';
 
-            my $frame = Net::WebSocket::Serializer::Client->create_close($code);
+            my $frame = Net::WebSocket::Frame::close->new(
+                code => $code,
+                mask => Net::WebSocket::Mask::create(),
+            );
 
             syswrite( $inet, $frame->to_bytes() );
 
@@ -199,7 +203,10 @@ sub _mux_after_handshake {
             _chunk_to_remote( $buf, $inet );
         }
 
-        my $close_frame = Net::WebSocket::Serializer::Client->create_close('SUCCESS');
+        my $close_frame = Net::WebSocket::Frame::close->new(
+            code => 'SUCCESS',
+            mask => Net::WebSocket::Mask::create(),
+        );
 
         syswrite( $inet, $close_frame->to_bytes() );
 
@@ -234,7 +241,10 @@ sub _chunk_to_remote {
 
     syswrite(
         $out_fh,
-        Net::WebSocket::Serializer::Client->create_binary($buf)->to_bytes(),
+        Net::WebSocket::Frame::binary->new(
+            payload_sr => \$buf,
+            mask => Net::WebSocket::Mask::create(),
+        )->to_bytes(),
     );
 
     return;

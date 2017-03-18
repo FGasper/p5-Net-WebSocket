@@ -5,7 +5,7 @@ use warnings;
 use autodie;
 
 use Net::WebSocket::Handshake::Server ();
-use Net::WebSocket::Serializer::Server ();
+use Net::WebSocket::Frame::close ();
 
 use constant MAX_CHUNK_SIZE => 64000;
 
@@ -56,7 +56,9 @@ sub set_signal_handlers_for_server {
 
             my $code = ($the_sig eq 'INT') ? 'ENDPOINT_UNAVAILABLE' : 'SERVER_ERROR';
 
-            my $frame = Net::WebSocket::Serializer::Server->create_close($code);
+            my $frame = Net::WebSocket::Frame::close->new(
+                code => $code,
+            );
 
             print { $inet } $frame->to_bytes();
 

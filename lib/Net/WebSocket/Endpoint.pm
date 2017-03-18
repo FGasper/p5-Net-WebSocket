@@ -15,6 +15,9 @@ See L<Net::WebSocket::Endpoint::Server>.
 use strict;
 use warnings;
 
+use Net::WebSocket::Frame::close ();
+use Net::WebSocket::Frame::ping ();
+use Net::WebSocket::Frame::pong ();
 use Net::WebSocket::Message ();
 use Net::WebSocket::X ();
 
@@ -27,6 +30,8 @@ sub new {
     #die "Missing: [@missing]" if @missing;
 
     my $self = {
+        _fragments => [],
+
         _ping_counter => 0,
         _max_pings => DEFAULT_MAX_PINGS,
         (map { ( "_$_" => $opts{$_} ) } qw(
@@ -56,14 +61,27 @@ sub get_next_message {
                 $self->{'_on_data_frame'}->($frame);
             }
 
-            if (!$frame->get_fin()) {
-                push @{ $self->{'_fragments'} }, $frame;
+            #Failure cases:
+            #   - continuation without prior fragment
+            #   - non-continuation within fragment
+
+            if ( $frame->get_type() eq 'continuation' ) {
+                if ( !@{ $self->{'_fragments'} } ) {
+                    $self->_got_continuation_during_non_fragment($frame);
+                }
             }
-            else {
+            elsif ( @{ $self->{'_fragments'} } ) {
+                $self->_got_non_continuation_during_fragment($frame);
+            }
+
+            if ($frame->get_fin()) {
                 return Net::WebSocket::Message::create_from_frames(
                     splice( @{ $self->{'_fragments'} } ),
                     $frame,
                 );
+            }
+            else {
+                push @{ $self->{'_fragments'} }, $frame;
             }
         }
     }
@@ -71,11 +89,52 @@ sub get_next_message {
     return undef;
 }
 
+sub _got_continuation_during_non_fragment {
+    my ($self, $frame) = @_;
+
+    my $msg = sprintf('Received continuation outside of fragment!');
+
+    #For now … there may be some multiplexing extension
+    #that allows some other behavior down the line,
+    #but let’s enforce standard protocol for now.
+    my $err_frame = Net::WebSocket::Frame::close->new(
+        code => 'PROTOCOL_ERROR',
+        reason => $msg,
+        $self->FRAME_MASK_ARGS(),
+    );
+
+    $self->_send_frame($err_frame);
+
+    die Net::WebSocket::X->create( 'ReceivedBadControlFrame', $msg );
+}
+
+sub _got_non_continuation_during_fragment {
+    my ($self, $frame) = @_;
+
+    my $msg = sprintf('Received %s; expected continuation!', $frame->get_type());
+
+    #For now … there may be some multiplexing extension
+    #that allows some other behavior down the line,
+    #but let’s enforce standard protocol for now.
+    my $err_frame = Net::WebSocket::Frame::close->new(
+        code => 'PROTOCOL_ERROR',
+        reason => $msg,
+        $self->FRAME_MASK_ARGS(),
+    );
+
+    $self->_send_frame($err_frame);
+
+    die Net::WebSocket::X->create( 'ReceivedBadControlFrame', $msg );
+}
+
 sub timeout {
     my ($self) = @_;
 
     if ($self->{'_ping_counter'} == $self->{'_max_pings'}) {
-        my $close = $self->create_close('POLICY_VIOLATION');
+        my $close = Net::WebSocket::Frame::close->new(
+            code => 'POLICY_VIOLATION',
+            $self->FRAME_MASK_ARGS(),
+        );
         print { $self->{'_out'} } $close->to_bytes();
         $self->{'_closed'} = 1;
     }
@@ -84,8 +143,9 @@ sub timeout {
 
     $self->{'_ping_texts'}{$ping_message} = 1;
 
-    my $ping = $self->_SERIALIZER()->create_ping(
+    my $ping = Net::WebSocket::Frame::ping->new(
         payload_sr => \$ping_message,
+        $self->FRAME_MASK_ARGS(),
     );
     print { $self->{'_out'} } $ping->to_bytes();
 
@@ -105,8 +165,9 @@ sub on_ping {
     my ($self, $frame) = @_;
 
     $self->_send_frame(
-        $self->_SERIALIZER()->create_pong(
-            $frame->get_payload(),
+        Net::WebSocket::Frame::pong->new(
+            payload_sr => \$frame->get_payload(),
+            $self->FRAME_MASK_ARGS(),
         ),
     );
 
@@ -139,8 +200,12 @@ sub _handle_control_frame {
     if ($type eq 'close') {
         $self->{'_closed'} = 1;
 
-        $resp_frame = $self->_SERIALIZER()->create_close(
-            $frame->get_code_and_reason(),
+        my ($code, $reason) = $frame->get_code_and_reason();
+
+        $resp_frame = Net::WebSocket::Frame::close->new(
+            code => $code,
+            reason => $reason,
+            $self->FRAME_MASK_ARGS(),
         );
 
         local $SIG{'PIPE'} = 'IGNORE';

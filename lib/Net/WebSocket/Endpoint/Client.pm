@@ -7,8 +7,10 @@ use parent qw(
     Net::WebSocket::Endpoint
 );
 
-use Net::WebSocket::Serializer::Client ();
+use Net::WebSocket::Mask ();
 
-use constant _SERIALIZER => 'Net::WebSocket::Serializer::Client';
+sub FRAME_MASK_ARGS {
+    return( mask => Net::WebSocket::Mask::create() );
+}
 
 1;

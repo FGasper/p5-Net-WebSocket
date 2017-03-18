@@ -41,7 +41,7 @@ sub get_next_frame {
     #expecting more soon to complete the frame.
     local $self->{'_reading_frame'} = 1;
 
-    my ($oct1, $oct2) = unpack('C2', $first2 );
+    my ($oct1, $oct2) = unpack('CC', $first2 );
 
     my $len = $oct2 & 0x7f;
 
@@ -104,9 +104,9 @@ sub get_next_frame {
 
     $self->{'_buffer'} = q<>;
 
-    my $opcode = ord( $oct1 & "\x0f" );
+    my $opcode = $oct1 & 0xf;
 
-    my $frame_class = $self->{'_opcode_class'} ||= do {
+    my $frame_class = $self->{'_opcode_class'}{$opcode} ||= do {
         my $class;
         if (my $cr = $self->can("OPCODE_CLASS_$opcode")) {
             $class = $cr->();

@@ -11,7 +11,6 @@ plan tests => 6;
 
 use Net::WebSocket::Endpoint::Server ();
 use Net::WebSocket::Parser ();
-use Net::WebSocket::Serializer::Server ();
 
 my $out_buffer = q<>;
 
@@ -133,7 +132,6 @@ open my $out_fh, '>>', \$out_buffer;
 
 my $ept = Net::WebSocket::Endpoint::Server->new(
     parser => $parser,
-    serializer => 'Net::WebSocket::Serializer::Server',
     out => $out_fh,
 );
 
