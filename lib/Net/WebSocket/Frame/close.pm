@@ -77,12 +77,14 @@ use strict;
 use warnings;
 
 use parent qw(
-    Net::WebSocket::ControlFrame
+    Net::WebSocket::Base::ControlFrame
 );
 
 use Call::Context ();
 
 use Net::WebSocket::Constants ();
+
+use constant get_opcode => 8;
 
 sub new {
     my ($class, %opts) = @_;

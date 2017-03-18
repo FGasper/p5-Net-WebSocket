@@ -17,8 +17,8 @@ use lib "$FindBin::Bin/../lib";
 
 use Net::WebSocket::Endpoint::Client ();
 use Net::WebSocket::Handshake::Client ();
-use Net::WebSocket::ParseFilehandle ();
-use Net::WebSocket::SerializeFilehandle::Client ();
+use Net::WebSocket::Parser ();
+use Net::WebSocket::Serializer::Client ();
 
 use constant MAX_CHUNK_SIZE => 64000;
 
@@ -125,11 +125,7 @@ my $sent_ping;
 sub _mux_after_handshake {
     my ($from_caller, $to_caller, $inet, $buf) = @_;
 
-    my $serializer = Net::WebSocket::SerializeFilehandle::Client->new(
-        $from_caller,
-    );
-
-    my $parser = Net::WebSocket::ParseFilehandle->new(
+    my $parser = Net::WebSocket::Parser->new(
         $inet,
         $buf,
     );
@@ -145,7 +141,7 @@ sub _mux_after_handshake {
 
             my $code = ($the_sig eq 'INT') ? 'SUCCESS' : 'ENDPOINT_UNAVAILABLE';
 
-            my $frame = $ept->create_close($code);
+            my $frame = Net::WebSocket::Serializer::Client->create_close($code);
 
             syswrite( $inet, $frame->to_bytes() );
 
@@ -179,7 +175,8 @@ sub _mux_after_handshake {
 
             for my $rdr (@$rdrs_ar) {
                 if ($rdr == $from_caller) {
-                    _chunk_to_remote($serializer, $inet);
+                    sysread $from_caller, my $buf, 32768;
+                    _chunk_to_remote($buf, $inet);
                 }
                 elsif ($rdr == $inet) {
                     if ( my $msg = $ept->get_next_message() ) {
@@ -198,9 +195,11 @@ sub _mux_after_handshake {
         }
     }
     else {
-        _chunk_to_remote($serializer, $inet);
+        while ( sysread $from_caller, my $buf, 32768 ) {
+            _chunk_to_remote( $buf, $inet );
+        }
 
-        my $close_frame = $ept->create_close('SUCCESS');
+        my $close_frame = Net::WebSocket::Serializer::Client->create_close('SUCCESS');
 
         syswrite( $inet, $close_frame->to_bytes() );
 
@@ -231,10 +230,12 @@ sub _mux_after_handshake {
 }
 
 sub _chunk_to_remote {
-    my ($serializer, $out_fh) = @_;
+    my ($buf, $out_fh) = @_;
 
-    my $msg = $serializer->flush_binary();
-    syswrite( $out_fh, $msg->to_bytes() );
+    syswrite(
+        $out_fh,
+        Net::WebSocket::Serializer::Client->create_binary($buf)->to_bytes(),
+    );
 
     return;
 }

@@ -27,8 +27,8 @@ use strict;
 use warnings;
 
 use parent qw(
-    Net::WebSocket::Parser
-    Net::WebSocket::ReadString
+    Net::WebSocket::Base::Parser
+    Net::WebSocket::Base::ReadString
 );
 
 sub _read {

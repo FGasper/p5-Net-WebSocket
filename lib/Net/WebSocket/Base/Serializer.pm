@@ -1,4 +1,4 @@
-package Net::WebSocket::SerializerBase;
+package Net::WebSocket::Base::Serializer;
 
 use strict;
 use warnings;

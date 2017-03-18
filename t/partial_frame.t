@@ -12,7 +12,7 @@ use Test::Deep;
 
 use IO::Select ();
 
-use Net::WebSocket::ParseFilehandle ();
+use Net::WebSocket::Parser ();
 
 my @tests = (
     {
@@ -48,7 +48,7 @@ for my $t (@tests) {
 
     my $frame;
 
-    my $parser = Net::WebSocket::ParseFilehandle->new( $rdr );
+    my $parser = Net::WebSocket::Parser->new( $rdr );
 
     my $ios = IO::Select->new($rdr);
 

@@ -1,4 +1,4 @@
-package Net::WebSocket::ReadString;
+package Net::WebSocket::Base::ReadString;
 
 use strict;
 use warnings;

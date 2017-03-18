@@ -3,7 +3,7 @@ package Net::WebSocket::Streamer;
 use strict;
 use warnings;
 
-use parent qw( Net::WebSocket::SerializerBase );
+use parent qw( Net::WebSocket::Base::Serializer );
 
 sub new {
     my ($class, $type) = @_;

@@ -1,7 +1,10 @@
 package Net::WebSocket::Message::text;
 
+use strict;
+use warnings;
+
 use parent qw(
-    Net::WebSocket::DataMessage
+    Net::WebSocket::Base::DataMessage
 );
 
 1;

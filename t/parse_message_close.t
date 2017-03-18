@@ -8,7 +8,7 @@ use Test::Deep;
 
 plan tests => 3;
 
-use Net::WebSocket::ParseString;
+use Net::WebSocket::Parser;
 
 my @tests = (
     [
@@ -71,7 +71,8 @@ my @tests = (
 );
 
 my $full_buffer = join( q<>, map { $_->[0] } @tests );
-my $parser = Net::WebSocket::ParseString->new( \$full_buffer );
+open my $bfh, '<', \$full_buffer;
+my $parser = Net::WebSocket::Parser->new( $bfh );
 
 for my $t (@tests) {
 

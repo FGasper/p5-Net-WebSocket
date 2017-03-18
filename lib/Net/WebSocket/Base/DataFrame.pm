@@ -1,20 +1,14 @@
-package Net::WebSocket::DataFrame;
+package Net::WebSocket::Base::DataFrame;
 
 use strict;
 use warnings;
 
 use parent qw(
     Net::WebSocket::Frame
-    Net::WebSocket::Typed
+    Net::WebSocket::Base::Typed
 );
 
 use constant is_control_frame => 0;
-
-sub get_fin {
-    my ($self) = @_;
-
-    return( ord ("\x80" & ${$self->[$self->FIRST2]}) && 1 );
-}
 
 sub _assemble_length {
     my ($class, $payload_sr) = @_;

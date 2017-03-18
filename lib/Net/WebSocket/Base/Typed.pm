@@ -1,4 +1,7 @@
-package Net::WebSocket::Typed;
+package Net::WebSocket::Base::Typed;
+
+use strict;
+use warnings;
 
 sub get_type {
     my ($self) = @_;

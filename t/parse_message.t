@@ -2,19 +2,20 @@
 
 use strict;
 use warnings;
+use autodie;
 
 use Test::More;
 use Test::Deep;
 
 plan tests => 6;
 
-use Net::WebSocket::Endpoint ();
-use Net::WebSocket::ParseString ();
+use Net::WebSocket::Endpoint::Server ();
+use Net::WebSocket::Parser ();
 use Net::WebSocket::Serializer::Server ();
 
 my $out_buffer = q<>;
 
-my $out_parser = Net::WebSocket::ParseString->new( \$out_buffer );
+my $full_buffer;
 
 my @tests = (
     [
@@ -52,6 +53,10 @@ my @tests = (
     [
         "\x89\x0bHello-ping\x0a" . "\x82\x00",
         sub {
+            open my $read_out_fh, '<', \$out_buffer;
+
+            my $out_parser = Net::WebSocket::Parser->new( $read_out_fh );
+
             cmp_deeply(
                 $out_parser->get_next_frame(),
                 all(
@@ -96,6 +101,10 @@ my @tests = (
                 'fragmented double hello with ping in the middle',
             ) or diag explain $_;
 
+            open my $read_out_fh, '<', \$out_buffer;
+
+            my $out_parser = Net::WebSocket::Parser->new( $read_out_fh );
+
             my $resp = $out_parser->get_next_frame();
 
             cmp_deeply(
@@ -116,12 +125,13 @@ my @tests = (
     ],
 );
 
-my $full_buffer = join( q<>, map { $_->[0] } @tests );
-my $parser = Net::WebSocket::ParseString->new( \$full_buffer );
+$full_buffer = join( q<>, map { $_->[0] } @tests );
+open my $full_read_fh, '<', \$full_buffer;
+my $parser = Net::WebSocket::Parser->new( $full_read_fh );
 
 open my $out_fh, '>>', \$out_buffer;
 
-my $ept = Net::WebSocket::Endpoint->new(
+my $ept = Net::WebSocket::Endpoint::Server->new(
     parser => $parser,
     serializer => 'Net::WebSocket::Serializer::Server',
     out => $out_fh,

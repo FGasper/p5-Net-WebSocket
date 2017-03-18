@@ -9,8 +9,7 @@ plan tests => 12;
 
 use File::Temp ();
 
-use Net::WebSocket::ParseString;
-use Net::WebSocket::ParseFilehandle;
+use Net::WebSocket::Parser;
 use Net::WebSocket::Mask ();
 
 use Carp::Always;
@@ -46,14 +45,15 @@ for my $t (@tests) {
 
     for my $tt ( [ unmasked => $raw ], [ masked => $raw_masked ] ) {
         my $bin = $tt->[1];
-        my $sr_parse = Net::WebSocket::ParseString->new( \do { my $v = $bin } );
+        open my $sfh, '<', \$bin;
+        my $sr_parse = Net::WebSocket::Parser->new( $sfh );
 
         my ($fh, $path) = File::Temp::tempfile( CLEANUP => 1 );
         print {$fh} $bin or die $!;
         close $fh;
 
         open my $rfh, '<', $path;
-        my $fh_parse = Net::WebSocket::ParseFilehandle->new( $rfh );
+        my $fh_parse = Net::WebSocket::Parser->new( $rfh );
 
         for my $ttt ( [ scalar => $sr_parse ], [ filehandle => $fh_parse ] ) {
             my $frame = $ttt->[1]->get_next_frame();

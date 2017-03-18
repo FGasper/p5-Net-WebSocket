@@ -1,5 +1,72 @@
 package Net::WebSocket::Frame;
 
+=encoding utf-8
+
+=head1 NAME
+
+Net::WebSocket::Frame
+
+=head1 SYNOPSIS
+
+    #Never instantiate Net::WebSocket::Frame directly;
+    #always call new() on a subclass:
+    my $frame = Net::WebSocket::Frame::text->new(
+        fin => 0,                   #to start a fragmented message
+        rsv => 0b11,                #RSV2 and RSV3 are on
+        mask => "\x01\x02\x03\x04   #clients MUST include; servers MUST NOT
+        payload_sr => \'Woot!',
+    );
+
+    $frame->get_fin();
+    $frame->get_mask_bytes();
+    $frame->get_payload();
+
+    $frame->set_rsv();
+    $frame->get_rsv();
+
+    $frame->to_bytes();     #for sending over the wire
+
+=head1 DESCRIPTION
+
+This is the base class for all frame objects. The interface as described
+above should be fairly straightforward.
+
+=head1 EXPERIMENTAL: CUSTOM FRAME CLASSES
+
+You can have custom frame classes, e.g., to support WebSocket extensions that
+use custom frame opcodes. RFC 6455 allocates opcodes 3-7 for data frames and
+11-15 (0xb - 0xf) for control frames.
+
+The best way to do this is to subclass either
+L<Net::WebSocket::Base::DataFrame> or L<Net::WebSocket::Base::ControlFrame>,
+depending on what kind of frame you’re dealing with.
+
+An example of such a class is below:
+
+    package My::Custom::Frame::booya;
+
+    use strict;
+    use warnings;
+
+    use parent qw( Net::WebSocket::Base::DataFrame );
+
+    use constant get_opcode => 3;
+
+    use constant get_type => 'booya';
+
+Note that L<Net::WebSocket::Parser> still won’t know how to handle such a
+custom frame, so if you intend to receive custom frames as part of messages,
+you’ll also need to create a custom base class of this class, then also
+subclass L<Net::WebSocket::Parser>. You may additionally want to subclass
+C<Net::WebSocket::Serializer::*>, and possibly C<Net::WebSocket::Streamer::*>,
+in order to expedite the creation of messages using your custom frame type.
+
+B<NOTE: THIS IS LARGELY UNTESTED.> I’m not familiar with any application that
+actually requires this feature. The C<permessage-deflate> extension seems to
+be the only one that has much widespread web browser support.
+
+=cut
+
 use strict;
 use warnings;
 
@@ -14,11 +81,9 @@ use constant {
     PAYLOAD => 3,
 };
 
-*OPCODE = *Net::WebSocket::Constants::OPCODE;
-
 #fin, rsv, mask, payload_sr
-#rsv is a bitmask of the three values, with most significant bit first.
-#So, if RSV1 (4) and RSV2 (2) are on, then rsv is 4 + 2 = 6;
+#rsv is a bitmask of the three values, with RSV1 as MOST significant bit.
+#So, represent RSV1 and RSV2 being on via 0b110 (= 4 + 2 = 6)
 sub new {
     my ($class, %opts) = @_;
 
@@ -26,7 +91,7 @@ sub new {
 
     my $type = $class->get_type();
 
-    my $opcode = OPCODE()->{$type};
+    my $opcode = $class->get_opcode($type);
 
     if (!defined $fin) {
         $fin = 1;
@@ -63,9 +128,8 @@ sub new {
 }
 
 # All string refs: first2, length octets, mask octets, payload
-#XXX TODO
 sub create_from_parse {
-    return bless \@_, __PACKAGE__;
+    return bless \@_, shift;
 }
 
 sub get_mask_bytes {
@@ -98,7 +162,7 @@ sub get_rsv {
     my ($self) = @_;
 
     #0b01110000 = 0x70
-    return( ord( ${ $self->[FIRST2] } & "\x70" ) >> 4 );
+    return( ord( substr( ${ $self->[FIRST2] }, 0, 1 ) & "\x70" ) >> 4 );
 }
 
 sub set_rsv {
@@ -108,6 +172,32 @@ sub set_rsv {
 
     return $self;
 }
+
+#----------------------------------------------------------------------
+#Redundancies with methods in DataFrame.pm and ControlFrame.pm.
+#These are here so that we don’t have to re-bless in order to get this
+#information.
+
+sub is_control_frame {
+    my ($self) = @_;
+
+    #8 == 0b1000 == 010
+    return( ($self->_extract_opcode() & 8) ? 1 : 0 );
+}
+
+sub get_fin {
+    my ($self) = @_;
+
+    return( ord ("\x80" & ${$self->[$self->FIRST2]}) && 1 );
+}
+
+#----------------------------------------------------------------------
+
+#sub get_opcode {
+#    my ($class) = @_;
+#
+#    die "$class (type “$type”) must define a custom get_opcode() method!";
+#}
 
 #----------------------------------------------------------------------
 
@@ -143,6 +233,11 @@ sub set_rsv {
 
 #----------------------------------------------------------------------
 
+sub opcode_to_type {
+    my ($class, $opcode) = @_;
+    return Net::WebSocket::Constants::opcode_to_type($opcode);
+}
+
 our $AUTOLOAD;
 sub AUTOLOAD {
     my ($self) = shift;
@@ -154,8 +249,8 @@ sub AUTOLOAD {
 
     #Figure out what type this is, and re-bless.
     if (ref($self) eq __PACKAGE__) {
-        my $opcode = $self->_get_opcode();
-        my $type = Net::WebSocket::Constants::opcode_to_type($opcode);
+        my $opcode = $self->_extract_opcode();
+        my $type = $self->opcode_to_type($opcode);
 
         my $class = __PACKAGE__ . "::$type";
         if (!$class->can('new')) {
@@ -176,7 +271,7 @@ sub AUTOLOAD {
 
 #----------------------------------------------------------------------
 
-sub _get_opcode {
+sub _extract_opcode {
     my ($self) = @_;
 
     return 0xf & ord substr( ${ $self->[FIRST2] }, 0, 1 );

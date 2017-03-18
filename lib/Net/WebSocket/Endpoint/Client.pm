@@ -5,8 +5,10 @@ use warnings;
 
 use parent qw(
     Net::WebSocket::Endpoint
-    Net::WebSocket::SerializerBase
-    Net::WebSocket::Masker::Client
 );
+
+use Net::WebSocket::Serializer::Client ();
+
+use constant _SERIALIZER => 'Net::WebSocket::Serializer::Client';
 
 1;

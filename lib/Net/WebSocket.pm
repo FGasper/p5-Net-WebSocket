@@ -1,12 +1,45 @@
 package Net::WebSocket;
 
-our $VERSION = '0.01_01';
+our $VERSION = '0.01_02';
 
 =encoding utf-8
 
 =head1 NAME
 
 Net::WebSocket - WebSocket protocol basics
+
+=head1 SYNOPSIS
+
+    my $handshake = Net::WebSocket::Handshake::Client->new(
+        uri => $uri,
+    );
+
+    syswrite $inet, $handshake->create_header_text() . "\x0d\x0a" or die $!;
+
+    my $req = HTTP::Response->parse($hdrs_txt);
+
+    #XXX More is required for the handshake validation in production!
+    my $accept = $req->header('Sec-WebSocket-Accept');
+    $handshake->validate_accept_or_die($accept);
+
+    my $parser = Net::WebSocket::ParseFilehandle->new(
+        $inet,
+        $leftover_from_header_read,     #can be nonempty on the client
+    );
+
+    my $ept = Net::WebSocket::Endpoint::Client->new(
+        out => $inet,
+        parser => $parser,
+    );
+
+    #Determine that $inet can be read from …
+
+    my $msg = $ept->get_next_message();
+
+    #… or, if we timeout while waiting for $inet be ready for reading:
+
+    $ept->timeout();
+    exit if $ept->is_closed();
 
 =head1 DESCRIPTION
 
@@ -18,106 +51,118 @@ a UNIX socket, ordinary TCP/IP, or whatever.
 
 As a result of this “bare-bones” approach, Net::WebSocket can probably
 fit your needs; however, it won’t interface directly with event frameworks,
-so you’ll need to write your own handling layer.
+so you’ll need to write your own handling layer. There are some examples
+of using L<IO::Select> for this in the distribution’s C<demo/> directory.
 
-This distribution provides five major areas of functionality:
+This is not a “quick-and-cheap” solution for WebSocket support; rather,
+Net::WebSocket attempts to support the protocol as completely, usefully,
+and flexibly as possible.
 
-=head2 1. PARSE WEBSOCKET
+=head1 OVERVIEW
 
-L<Net::WebSocket::ParseFilehandle> and L<Net::WebSocket::ParseString> expose
-logic to parse a stream or a buffer into either messages or frames.
+WebSocket is almost “two protocols for the price of one”: the
+HTTP headers for the handshake, and the framing logic for the actual data
+exchange. The HTTP headers portion is complex enough, and has enough support
+in other CPAN modules, that this distribution only provides a few basic tools
+for doing the handshake. It’s enough to get you where you need to go, but
+not much more.
 
-=head2 2. SERIALIZE RAW DATA
+The lion’s share of Net::WebSocket concerns the actual data exchange.
+To fit diverse usage patterns, this distribution includes logic at varying
+levels of abstraction:
 
-For serialization turn to these modules:
+=head2 L<Net::WebSocket::Handshake::Server>
 
-=over
+=head2 L<Net::WebSocket::Handshake::Client>
 
-=item * L<Net::WebSocket::SerializeFilehandle::Client>
+Logic for handshakes. These are probably most useful in tandem with
+modules like L<HTTP::Request> and L<HTTP::Response>.
 
-=item * L<Net::WebSocket::SerializeFilehandle::Server>
 
-=item * L<Net::WebSocket::SerializeString::Client>
+=head2 L<Net::WebSocket::Endpoint::Server>
 
-=item * L<Net::WebSocket::SerializeString::Server>
+=head2 L<Net::WebSocket::Endpoint::Client>
 
-=back
+The highest-level abstraction that this distribution provides. It parses input
+and responds to control frames and timeouts. You can use this to receive
+streamed (i.e., fragmented) transmissions as well.
 
-L<As per the specification|https://tools.ietf.org/html/rfc6455#section-5.1>,
+=head2 L<Net::WebSocket::Serializer::Server>
+
+=head2 L<Net::WebSocket::Serializer::Client>
+
+Bread-and-butter logic for creating frames/messages to be sent over the wire.
+
+=head2 L<Net::WebSocket::Streamer::Server>
+
+=head2 L<Net::WebSocket::Streamer::Client>
+
+Like the “Serializer” classes, but useful for sending streamed
+(fragmented) data as opposed to full messages all at once.
+
+=head2 L<Net::WebSocket::ParseFilehandle>
+
+=head2 L<Net::WebSocket::ParseString>
+
+The “inverse” of the serialization/streaming classes: this is how
+you translate WebSocket frames into useful data for your application.
+
+=head2 Net::WebSocket::Frame::*
+
+Useful if you want to create raw frames. Probably less useful for production
+than the modules that wrap these.
+
+=head1 IMPLEMENTATION NOTES
+
+=head2 Masking
+
+As per L<the specification|https://tools.ietf.org/html/rfc6455#section-5.1>,
 client serializers “MUST” mask the data randomly, whereas server serializers
 “MUST NOT” do this. Net::WebSocket does this for you automatically
 (courtesy of L<Bytes::Random::Secure::Tiny>), but you need to distinguish
 between client serializers—which do masking—and server serializers, which
 don’t mask.
 
+=head2 Text vs. Binary
+
 Recall that in some languages—like JavaScript!—the difference between
 “text” and “binary” is much more significant than for us in Perl.
 
-=head2 3. CREATE MESSAGES
-
-A message is the smallest unit of application-level payload from WebSocket;
-that is, a single group of fragmented frames is understood as one “message”.
-(Likewise, a single, complete frame is also one “message”.)
-
-This functionality, because of WebSocket’s mandatory client-to-server payload
-masking, exists as part of the serialization classes. See those for more
-information.
-
-=head2 4. CREATE FRAMES
-
-You can create a WebSocket frame directly using one of the message type
-classes:
-
-=over
-
-=item * L<Net::WebSocket::Frame::text>
-
-=item * L<Net::WebSocket::Frame::binary>
-
-=item * L<Net::WebSocket::Frame::ping>
-
-=item * L<Net::WebSocket::Frame::pong>
-
-=item * L<Net::WebSocket::Frame::close>
-
-=item * L<Net::WebSocket::Frame::continuation>
-
-=back
-
-This lets you do
-some illegal things like misusing continuation frames. You shouldn’t
-use this unless you’re familiar with the guts of the WebSocket protocol.
-
-=head2 5. HANDSHAKE LOGIC
-
-There are lots of levels at which handshake functionality may be desired;
-consult the following modules for more details of what this distribution
-offers for now:
-
-=over
-
-=item L<Net::WebSocket::Handshake::Client>
-
-=item L<Net::WebSocket::Handshake::Server>
-
-=back
-
-#----------------------------------------------------------------------
-
-=head1 IMPLEMENTATION NOTES
+=head2 Parsed Frame Classes
 
 Net::WebSocket tries to be as light as possible and so, when it parses out
 a frame, at first only a base L<Net::WebSocket::Frame> implementation is
 created. An AUTOLOAD method will “upgrade” any such frame that needs the
 specific methods of its class.
 
-#----------------------------------------------------------------------
+=head1 EXTENDING Net::WebSocket
+
+The WebSocket specification envisions several methods of extending the
+protocol, all of which Net::WebSocket supports:
+
+=over
+
+=item * The three reserved bits in each frame’s header.
+(See L<Net::WebSocket::Frame>.)
+
+=item * Additional opcodes: 3-7 and 11-15. You’ll need to subclass
+L<Net::WebSocket::Frame> for this, and you will likely want to subclass
+L<Net::WebSocket::Parser>.
+If you’re using the custom classes for streaming, then you can
+also subclass L<Net::WebSocket::Streamer>. See each of those modules for
+more information on doing this.
+
+B<THIS IS NOT WELL TESTED.> Proceed with caution, and please file bug
+reports as needed.
+
+=item * Apportion part of the payload data for the extension. This you
+can do in your application.
+
+=back
 
 =head1 TODO
 
 There currently is no handling of the C<Sec-WebSocket-Extensions> header.
-
-#----------------------------------------------------------------------
 
 =head1 SEE ALSO
 
@@ -126,7 +171,7 @@ things this distribution avoids by design:
 
 =over
 
-=item * Network and event logic
+=item * Event loop logic
 
 =item * Support for pre-RFC-6455 versions of WebSocket
 
@@ -134,7 +179,7 @@ things this distribution avoids by design:
 
 =head1 REPOSITORY
 
-https://github.com/FGasper/p5-Data-WebSocket
+https://github.com/FGasper/p5-Net-WebSocket
 
 =head1 AUTHOR
 
@@ -142,11 +187,11 @@ Felipe Gasper (FELIPE)
 
 =head1 COPYRIGHT
 
-Copyright 2017 by L<http://gaspersoftware.com|Gasper Software Consulting, LLC>
+Copyright 2017 by L<Gasper Software Consulting, LLC|http://gaspersoftware.com>
 
 =head1 LICENSE
 
-This distribution is released under the license as Perl.
+This distribution is released under the same license as Perl.
 
 =cut
 

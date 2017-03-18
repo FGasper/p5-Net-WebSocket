@@ -37,7 +37,9 @@ use strict;
 use warnings;
 
 use parent qw(
-    Net::WebSocket::DataFrame
+    Net::WebSocket::Base::DataFrame
 );
+
+use constant get_opcode => 1;
 
 1;

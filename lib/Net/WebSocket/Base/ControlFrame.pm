@@ -1,8 +1,11 @@
-package Net::WebSocket::ControlFrame;
+package Net::WebSocket::Base::ControlFrame;
+
+use strict;
+use warnings;
 
 use parent qw(
     Net::WebSocket::Frame
-    Net::WebSocket::Typed
+    Net::WebSocket::Base::Typed
 );
 
 use constant get_fin => 1;

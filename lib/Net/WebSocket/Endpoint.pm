@@ -1,5 +1,17 @@
 package Net::WebSocket::Endpoint;
 
+=encoding utf-8
+
+=head1 NAME
+
+Net::WebSocket::Endpoint
+
+=head1 DESCRIPTION
+
+See L<Net::WebSocket::Endpoint::Server>.
+
+=cut
+
 use strict;
 use warnings;
 
@@ -15,24 +27,19 @@ sub new {
     #die "Missing: [@missing]" if @missing;
 
     my $self = {
-        _sent_pings => 0,
+        _ping_counter => 0,
         _max_pings => DEFAULT_MAX_PINGS,
         (map { ( "_$_" => $opts{$_} ) } qw(
             parser
             out
             max_pings
+
+            on_data_frame
+            before_send_control_frame
         )),
     };
 
     return bless $self, $class;
-}
-
-#To facilitate chunking.
-sub set_data_handler {
-    my ($self, $todo_cr) = @_;
-    $self->{'_on_data'} = $todo_cr;
-
-    return;
 }
 
 sub get_next_message {
@@ -45,8 +52,8 @@ sub get_next_message {
             $self->_handle_control_frame($frame);
         }
         else {
-            if ($self->{'_on_data'}) {
-                $self->{'_on_data'}->($frame);
+            if ($self->{'_on_data_frame'}) {
+                $self->{'_on_data_frame'}->($frame);
             }
 
             if (!$frame->get_fin()) {
@@ -67,18 +74,22 @@ sub get_next_message {
 sub timeout {
     my ($self) = @_;
 
-    if ($self->{'_sent_pings'} == $self->{'_max_pings'}) {
+    if ($self->{'_ping_counter'} == $self->{'_max_pings'}) {
         my $close = $self->create_close('POLICY_VIOLATION');
         print { $self->{'_out'} } $close->to_bytes();
         $self->{'_closed'} = 1;
     }
 
-    my $ping = $self->create_ping(
-        payload_sr => \"$self->{'_sent_pings'} of $self->{'_max_pings'}",
+    my $ping_message = sprintf("%s UTC: $self->{'_ping_counter'} (%s)", scalar(gmtime), rand);
+
+    $self->{'_ping_texts'}{$ping_message} = 1;
+
+    my $ping = $self->_SERIALIZER()->create_ping(
+        payload_sr => \$ping_message,
     );
     print { $self->{'_out'} } $ping->to_bytes();
 
-    $self->{'_sent_pings'}++;
+    $self->{'_ping_counter'}++;
 
     return;
 }
@@ -90,49 +101,76 @@ sub is_closed {
 
 #----------------------------------------------------------------------
 
+sub on_ping {
+    my ($self, $frame) = @_;
+
+    $self->_send_frame(
+        $self->_SERIALIZER()->create_pong(
+            $frame->get_payload(),
+        ),
+    );
+
+    return;
+}
+
+sub on_pong {
+    my ($self, $frame) = @_;
+
+    #NB: We expect a response to any ping that we’ve sent; any pong
+    #we receive that doesn’t actually correlate to a ping we’ve sent
+    #is ignored—i.e., it doesn’t reset the ping counter. This means that
+    #we could still timeout even if we’re receiving pongs.
+    if (delete $self->{'_ping_texts'}{$frame->get_payload()}) {
+        $self->{'_ping_counter'} = 0;
+    }
+
+    return;
+}
+
+#----------------------------------------------------------------------
+
 sub _handle_control_frame {
     my ($self, $frame) = @_;
 
-    if ($frame->get_type() eq 'close') {
-        my $rframe = $self->create_close(
+    my ($resp_frame, $error, $ignore_sigpipe);
+
+    my $type = $frame->get_type();
+
+    if ($type eq 'close') {
+        $self->{'_closed'} = 1;
+
+        $resp_frame = $self->_SERIALIZER()->create_close(
             $frame->get_code_and_reason(),
         );
 
         local $SIG{'PIPE'} = 'IGNORE';
 
-        print { $self->{'_out'} } $rframe->to_bytes();
-
-        $self->{'_closed'} = 1;
+        $self->_send_frame($resp_frame);
 
         die Net::WebSocket::X->create('ReceivedClose', $frame);
     }
-    elsif ($frame->get_type() eq 'ping') {
-        my $pong = $self->create_pong(
-            $frame->get_payload(),
-        );
-
-        print { $self->{'_out'} } $pong->to_bytes();
-    }
-    elsif ($frame->get_type() eq 'pong') {
-        if ($self->{'_sent_pings'}) {
-            $self->{'_sent_pings'}--;
-        }
-        else {
-            my $cframe = $self->create_close(
-                'PROTOCOL_ERROR',
-                'pong without ping',
-            );
-
-            print { $self->{'_out'} } $cframe->to_bytes();
-
-            $self->{'_closed'} = 1;
-
-            die sprintf("pong (%s) without ping", $frame->get_payload());
-        }
+    elsif ( my $handler_cr = $self->can("on_$type") ) {
+        $handler_cr->( $self, $frame );
     }
     else {
-        die "Unrecognized control frame ($frame)";
+        my $ref = ref $self;
+        die Net::WebSocket::X->create(
+            'ReceivedBadControlFrame',
+            "“$ref” cannot handle a control frame of type “$type”",
+        );
     }
+
+    return;
+}
+
+sub _send_frame {
+    my ($self, $frame) = @_;
+
+    if ($self->can('_before_send_frame')) {
+        $self->_before_send_frame($frame);
+    }
+
+    print { $self->{'_out'} } $frame->to_bytes();
 
     return;
 }

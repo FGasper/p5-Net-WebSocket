@@ -79,7 +79,6 @@ sub _create_header_lines {
     }
 
     return (
-        #"GET $path HTTP/1.1",
         "GET $path HTTP/1.1",
         "Host: $self->{'uri_host'}",
 

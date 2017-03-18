@@ -17,7 +17,7 @@ use lib "$FindBin::Bin/lib";
 use NWDemo ();
 
 use Net::WebSocket::Endpoint::Server ();
-use Net::WebSocket::ParseFilehandle ();
+use Net::WebSocket::Parser ();
 use Net::WebSocket::Streamer::Server ();
 
 my $host_port = $ARGV[0] || die "Need host:port or port!\n";
@@ -44,7 +44,7 @@ while ( my $sock = $server->accept() ) {
 
     NWDemo::set_signal_handlers_for_server($sock);
 
-    my $parser = Net::WebSocket::ParseFilehandle->new($sock);
+    my $parser = Net::WebSocket::Parser->new($sock);
 
     $sock->blocking(0);
 

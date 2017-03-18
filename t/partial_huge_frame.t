@@ -12,7 +12,7 @@ use Test::Deep;
 
 use IO::Select ();
 
-use Net::WebSocket::ParseFilehandle ();
+use Net::WebSocket::Parser ();
 
 plan tests => 1;
 

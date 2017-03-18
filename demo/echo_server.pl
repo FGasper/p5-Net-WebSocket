@@ -21,7 +21,7 @@ use Net::WebSocket::Frame::text ();
 use Net::WebSocket::Frame::binary ();
 use Net::WebSocket::Frame::continuation ();
 use Net::WebSocket::Handshake::Server ();
-use Net::WebSocket::ParseFilehandle ();
+use Net::WebSocket::Parser ();
 
 my $host_port = $ARGV[0] || die "Need host:port or port!\n";
 
@@ -47,7 +47,7 @@ while ( my $sock = $server->accept() ) {
 
     NWDemo::set_signal_handlers_for_server($sock);
 
-    my $parser = Net::WebSocket::ParseFilehandle->new($sock);
+    my $parser = Net::WebSocket::Parser->new($sock);
 
     $sock->blocking(0);
 

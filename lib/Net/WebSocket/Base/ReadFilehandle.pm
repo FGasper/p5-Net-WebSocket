@@ -1,7 +1,9 @@
-package Net::WebSocket::ReadFilehandle;
+package Net::WebSocket::Base::ReadFilehandle;
 
 use strict;
 use warnings;
+
+use Try::Tiny;
 
 use Net::WebSocket::X ();
 
@@ -14,8 +16,19 @@ sub new {
         $start_buf = q<>;
     }
 
-    return bless { _fh => $fh, _start_buf => $start_buf }, $class;
+    #Determine if this is an OS-level filehandle;
+    #if it is, then we read with sysread(); otherwise we use read().
+    my $fileno = try { fileno $fh };
+    undef $fileno if defined($fileno) && $fileno == -1;
+
+    return bless {
+        _fh => $fh,
+        _start_buf => $start_buf,
+        _is_io => defined $fileno,
+    }, $class;
 }
+
+my $bytes_read;
 
 sub _read {
     my ($self, $len) = @_;
@@ -26,18 +39,10 @@ sub _read {
 
     if (length $self->{'_start_buf'}) {
         if ($len < length $self->{'_start_buf'}) {
-            substr(
-                $buf, 0, 0,
-                substr( $self->{'_start_buf'}, 0, $len, q<> ),
-            );
-
-            return $buf;
+            return $buf . substr( $self->{'_start_buf'}, 0, $len, q<> );
         }
         else {
-            substr(
-                $buf, 0, 0,
-                substr( $self->{'_start_buf'}, 0, length($self->{'_start_buf'}), q<> ),
-            );
+            $buf .= substr( $self->{'_start_buf'}, 0, length($self->{'_start_buf'}), q<> );
 
             $len -= length($self->{'_start_buf'});
         }
@@ -45,7 +50,14 @@ sub _read {
 
     local $!;
 
-    sysread( $self->{'_fh'}, $buf, $len, length $buf ) or do {
+    if ($self->{'_is_io'}) {
+        $bytes_read = sysread( $self->{'_fh'}, $buf, $len, length $buf );
+    }
+    else {
+        $bytes_read = read( $self->{'_fh'}, $buf, $len, length $buf );
+    }
+
+    if (!$bytes_read) {
 
         #If “_reading_frame” is set, then we’re in the middle of reading
         #a frame, in which context we don’t want to die() on EAGAIN because
