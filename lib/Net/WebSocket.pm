@@ -130,7 +130,7 @@ specific methods of its class.
 
 =head1 EXTENDING Net::WebSocket
 
-The WebSocket specification envisions several methods of extending the
+The WebSocket specification describes several methods of extending the
 protocol, all of which Net::WebSocket supports:
 
 =over
@@ -160,7 +160,7 @@ pre-standard versions of the WebSocket protocol.
 
 =head1 REPOSITORY
 
-https://github.com/FGasper/p5-Net-WebSocket
+L<https://github.com/FGasper/p5-Net-WebSocket>
 
 =head1 AUTHOR
 
