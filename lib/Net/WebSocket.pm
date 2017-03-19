@@ -87,30 +87,23 @@ The highest-level abstraction that this distribution provides. It parses input
 and responds to control frames and timeouts. You can use this to receive
 streamed (i.e., fragmented) transmissions as well.
 
-=head2 L<Net::WebSocket::Serializer::Server>
-
-=head2 L<Net::WebSocket::Serializer::Client>
-
-Bread-and-butter logic for creating frames/messages to be sent over the wire.
-
 =head2 L<Net::WebSocket::Streamer::Server>
 
 =head2 L<Net::WebSocket::Streamer::Client>
 
-Like the “Serializer” classes, but useful for sending streamed
-(fragmented) data as opposed to full messages all at once.
+Useful for sending streamed (fragmented) data rather than
+a full message in a single frame.
 
-=head2 L<Net::WebSocket::ParseFilehandle>
+=head2 L<Net::WebSocket::Parser>
 
-=head2 L<Net::WebSocket::ParseString>
-
-The “inverse” of the serialization/streaming classes: this is how
-you translate WebSocket frames into useful data for your application.
+Translate WebSocket frames out of a filehandle into useful data for
+your application.
 
 =head2 Net::WebSocket::Frame::*
 
-Useful if you want to create raw frames. Probably less useful for production
-than the modules that wrap these.
+Useful for creating raw frames. For data frames (besides continuation),
+these will be your bread-and-butter. See L<Net::WebSocket::Frame::text>
+for sample usage.
 
 =head1 IMPLEMENTATION NOTES
 

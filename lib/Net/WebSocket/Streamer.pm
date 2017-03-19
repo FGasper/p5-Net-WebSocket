@@ -3,7 +3,7 @@ package Net::WebSocket::Streamer;
 use strict;
 use warnings;
 
-use parent qw( Net::WebSocket::Base::Serializer );
+use Net::WebSocket::Frame::continuation ();
 
 use constant FINISHED_INDICATOR => __PACKAGE__ . '::__ALREADY_SENT_FINAL';
 
@@ -22,14 +22,14 @@ sub create_chunk {
 
     my $frame = $$self->new(
         fin => 0,
-        mask => $self->_create_new_mask(),
+        $self->FRAME_MASK_ARGS(),
         payload_sr => \$_[0],
     );
 
     #The first $frame we create needs to be text/binary, but all
     #subsequent ones must be continuation.
-    if (!$frame->isa('Net::WebSocket::Frame::continuation')) {
-        substr( $$self, 1 + rindex($$self, ':') ) = 'continuation';
+    if ($$self ne 'Net::WebSocket::Frame::continuation') {
+        $$self = 'Net::WebSocket::Frame::continuation';
     }
 
     return $frame;
@@ -40,13 +40,24 @@ sub create_final {
 
     my $frame = $$self->new(
         fin => 1,
-        mask => $self->_create_new_mask(),
+        $self->FRAME_MASK_ARGS(),
         payload_sr => \$_[0],
     );
 
     substr( $$self, 0 ) = FINISHED_INDICATOR();
 
     return $frame;
+}
+
+sub _load_frame_class {
+    my ($self, $type) = @_;
+
+    my $class = "Net::WebSocket::Frame::$type";
+    if (!$class->can('new')) {
+        Module::Load::load($class);
+    }
+
+    return $class;
 }
 
 sub DESTROY {

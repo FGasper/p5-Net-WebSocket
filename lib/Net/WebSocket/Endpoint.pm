@@ -33,8 +33,9 @@ sub new {
         _fragments => [],
 
         _ping_counter => 0,
-        _max_pings => DEFAULT_MAX_PINGS,
-        (map { ( "_$_" => $opts{$_} ) } qw(
+        _max_pings => $class->DEFAULT_MAX_PINGS(),
+
+        (map { defined($opts{$_}) ? ( "_$_" => $opts{$_} ) : () } qw(
             parser
             out
             max_pings

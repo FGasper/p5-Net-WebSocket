@@ -5,12 +5,7 @@ use warnings;
 
 use parent qw(
     Net::WebSocket::Endpoint
+    Net::WebSocket::Masker::Client
 );
-
-use Net::WebSocket::Mask ();
-
-sub FRAME_MASK_ARGS {
-    return( mask => Net::WebSocket::Mask::create() );
-}
 
 1;

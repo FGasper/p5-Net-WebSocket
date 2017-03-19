@@ -11,18 +11,22 @@ use Test::More;
 plan tests => 1;
 
 use Net::WebSocket::Parser ();
+use Net::WebSocket::Streamer::Client ();
 
 my $start = 'We have come to dedicate a portion of that field as a final resting-place to those who here gave their lives that that nation might live. It is altogether fitting and proper that we should do this; yet, in a larger sense, we cannot dedicate, we cannot consecrate, we cannot hallow this ground. The brave men, living and dead, who struggled here have consecrated it far beyond our poor power to add or detract. The world will little note …';
 
 my $start_copy = $start;
 
-my $ser = t::SerializeString->new( \$start_copy );
-
 pipe( my $rdr, my $wtr );
 
-while (length $start_copy) {
-    my $msg = $ser->create_text(25);
-    print {$wtr} $_->to_bytes() for $msg->get_frames();
+while (my $chunk = substr($start_copy, 0, 25, q<>)) {
+    my $streamer = Net::WebSocket::Streamer::Client->new('text');
+    while( length($chunk) > 10 ) {
+        my $subchunk = substr($chunk, 0, 10, q<>);
+        print {$wtr} $streamer->create_chunk($subchunk)->to_bytes();
+    }
+
+    print {$wtr} $streamer->create_final($chunk)->to_bytes();
 }
 
 close $wtr;
@@ -33,6 +37,7 @@ my $received = q<>;
 
 while ( my $msg = $parse->get_next_frame() ) {
     $received .= $msg->get_payload();
+diag $msg->get_payload();
 }
 
 is(
@@ -40,13 +45,5 @@ is(
     $start,
     'round-trip',
 );
-
-#----------------------------------------------------------------------
-
-package t::SerializeString;
-
-use parent qw( Net::WebSocket::SerializeString::Client );
-
-use constant MAX_FRAGMENT => 10;
 
 1;

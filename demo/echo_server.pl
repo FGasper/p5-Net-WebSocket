@@ -58,20 +58,20 @@ while ( my $sock = $server->accept() ) {
     my $ept = Net::WebSocket::Endpoint::Server->new(
         parser => $parser,
         out => $sock,
+
+        on_data_frame => sub {
+            my ($frame) = @_;
+
+            my $answer = 'Net::WebSocket::Frame::' . $frame->get_type();
+            $answer = $answer->new(
+                fin => $frame->get_fin(),
+                rsv => $frame->get_rsv(),
+                payload_sr => \$frame->get_payload(),
+            );
+
+            print { $sock } $answer->to_bytes();
+        },
     );
-
-    $ept->set_data_handler( sub {
-        my ($frame) = @_;
-
-        my $answer = 'Net::WebSocket::Frame::' . $frame->get_type();
-        $answer = $answer->new(
-            fin => $frame->get_fin(),
-            rsv => $frame->get_rsv(),
-            payload_sr => \$frame->get_payload(),
-        );
-
-        print { $sock } $answer->to_bytes();
-    } );
 
     while (!$ept->is_closed()) {
         my ( $rdrs_ar, undef, $errs_ar ) = IO::Select->select( $s, undef, $s, 10 );

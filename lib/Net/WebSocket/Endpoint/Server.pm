@@ -125,7 +125,7 @@ a C<get_frames()> method, which you can use to read the reserved bits
 of the individual data frames.
 
 =item * You can create C<on_*> methods on a subclass of this module
-to handle different types of control frames. (e.g., C<on_foo( FRAME )>)
+to handle different types of control frames. (e.g., C<on_foo(FRAME)>)
 to handle frames of type C<foo>.) The C<parser> object that you pass
 to the constructor has to be aware of such messages; for more details,
 see the documentation for L<Net::WebSocket::Parser>.
@@ -139,8 +139,7 @@ use warnings;
 
 use parent qw(
     Net::WebSocket::Endpoint
+    Net::WebSocket::Masker::Server
 );
-
-use constant FRAME_MASK_ARGS => ();
 
 1;
