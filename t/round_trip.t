@@ -37,7 +37,6 @@ my $received = q<>;
 
 while ( my $msg = $parse->get_next_frame() ) {
     $received .= $msg->get_payload();
-diag $msg->get_payload();
 }
 
 is(

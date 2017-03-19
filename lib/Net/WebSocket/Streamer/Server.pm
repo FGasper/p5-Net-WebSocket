@@ -30,7 +30,7 @@ message without buffering the full contents.
 You can subclass this module to support initial frame types other than
 text or binary. (Subsequent frames are always continuations.)
 
-You can also sent the reserved bytes manually on the individual frames
+You can also set the reserved bytes manually on the individual frames
 to support extensions that involve those bits.
 
 =cut
