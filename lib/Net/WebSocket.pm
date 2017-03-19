@@ -153,22 +153,10 @@ can do in your application.
 
 =back
 
-=head1 TODO
-
-There currently is no handling of the C<Sec-WebSocket-Extensions> header.
-
 =head1 SEE ALSO
 
-L<Protocol::WebSocket> is an older WebSocket module that does two
-things this distribution avoids by design:
-
-=over
-
-=item * Event loop logic
-
-=item * Support for pre-RFC-6455 versions of WebSocket
-
-=back
+L<Protocol::WebSocket> is an older module that supports
+pre-standard versions of the WebSocket protocol.
 
 =head1 REPOSITORY
 
