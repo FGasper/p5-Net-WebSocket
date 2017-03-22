@@ -4,6 +4,8 @@ use strict;
 use warnings;
 use autodie;
 
+use HTTP::Request ();
+
 use Net::WebSocket::Handshake::Server ();
 use Net::WebSocket::Frame::close ();
 

@@ -51,23 +51,34 @@ sub _read {
     local $!;
 
     if ($self->{'_is_io'}) {
-        $bytes_read = sysread( $self->{'_fh'}, $buf, $len, length $buf );
+        {
+            $bytes_read = sysread( $self->{'_fh'}, $buf, $len, length $buf );
+
+            if ($!{'EINTR'}) {
+
+                #“man 2 read” says EINTR means no bytes were read,
+                #but let’s assume that could be wrong, just in case:
+                $len -= $bytes_read;
+
+                redo;
+            }
+        }
+
+        if (!$bytes_read) {
+
+            #If “_reading_frame” is set, then we’re in the middle of reading
+            #a frame, in which context we don’t want to die() on EAGAIN because
+            #we accept the risk of incomplete reads there in exchange for
+            #speed and simplicity. (Most of the time a full frame should indeed
+            #be ready anyway.)
+            if (!$self->{'_reading_frame'} || !$!{'EAGAIN'}) {
+                die Net::WebSocket::X->create('ReadFilehandle', $!) if $!;
+            }
+        }
     }
     else {
         $bytes_read = read( $self->{'_fh'}, $buf, $len, length $buf );
     }
-
-    if (!$bytes_read) {
-
-        #If “_reading_frame” is set, then we’re in the middle of reading
-        #a frame, in which context we don’t want to die() on EAGAIN because
-        #we accept the risk of incomplete reads there in exchange for
-        #speed and simplicity. (Most of the time a full frame should indeed
-        #be ready anyway.)
-        if (!$self->{'_reading_frame'} || !$!{'EAGAIN'}) {
-            die Net::WebSocket::X->create('ReadFilehandle', $!) if $!;
-        }
-    };
 
     return $buf;
 }

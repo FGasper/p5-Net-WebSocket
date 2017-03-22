@@ -10,13 +10,8 @@ Net::WebSocket::Parser - Parse WebSocket from a filehandle
 
     my $parse = Net::WebSocket::Parser->new( $filehandle, $pre_buffer );
 
-    while ( my $msg = $parse->get_next_message( \&_control_frame_handler ) ) {
-        print $msg->get_payload();
-    }
-
-    while ( my $frame = $parse->get_next_frame() ) {
-        ...
-    }
+    #See below for error responses
+    my $frame = $parse->get_next_frame();
 
 The extra parameter to C<new()>, C<$pre_buffer>, is whatever you may need to
 parse first and may have already been read from the filehandle. For example, if
@@ -25,18 +20,39 @@ server has sent frames immediately after its handshake, you’ll probably have
 already read at least part of those initial frames from the server into
 C<$pre_buffer>.
 
-A message consists of 1 or more frames. A multi-frame message is said
-to be “fragmented”. Control messages cannot be fragmented.
+=head1 METHODS
 
-Note that C<get_next_message()> accepts a coderef as an optional argument;
-this coderef is invoked as a callback whenever the received frame is a control
-frame. You probably should always include this with a call to
-C<get_next_message()>, as the WebSocket peer is free to send a ping or even
-to close the connection among message fragments.
+=head2 I<OBJ>->get_next_frame()
 
-In the event that you want to avoid buffering an entire fragmented message,
-you should use C<get_next_frame()> and manually examine each frame’s
-C<get_type()> and C<get_fin()> results to determine when the message is done.
+A call to this methods yields one of the following:
+
+=over
+
+=item * If a frame can be read, it will be returned.
+
+=item * If only a partial frame is ready, undef is returned.
+
+=item * If the filehandle is an OS-level filehandle and an error other than EINTR
+occurs, L<Net::WebSocket::X::ReadFilehandle> is thrown.
+Also note that EAGAIN produces an exception if and only if that error occurs
+on the initial read. (See below.)
+
+=item * If nothing at all is returned, and there is no error,
+L<Net::WebSocket::X::EmptyRead> is thrown. (This likely means that
+the filehandle/socket is closed.)
+
+=head1 I/O DETAILS
+
+This reads from the filehandle exactly as many bytes as are needed at a
+given time: the first read is two bytes, after which the number of bytes
+that those two bytes indicate are read.
+
+For this to work, each non-blocking read must follow a
+call to C<select()> to ensure that the filehandle is ready to
+yield data. Otherwise you’ll deal with spurious EAGAIN errors and the like.
+The intent here is that you should not need to ignore any OS errors.
+
+If EINTR is received, we retry the read.
 
 =head1 CUSTOM FRAMES SUPPORT
 

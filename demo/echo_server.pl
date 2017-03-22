@@ -6,7 +6,6 @@ use autodie;
 
 use Try::Tiny;
 
-use HTTP::Request ();
 use IO::Socket::INET ();
 use IO::Select ();
 

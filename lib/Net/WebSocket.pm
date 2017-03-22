@@ -41,6 +41,15 @@ Net::WebSocket - WebSocket protocol basics
     $ept->timeout();
     exit if $ept->is_closed();
 
+=head1 ALPHA QUALITY
+
+This is a preliminary release. It is not meant for
+production work, but please do play with it and see how it works for you.
+Bug reports, especially with reproducible test cases, would be very welcome!
+
+Note that while breaking changes to the interface are unlikely,
+neither are they out of the question. Change the changelog before updating!
+
 =head1 DESCRIPTION
 
 This distribution provides a set of fundamental tools for communicating via
