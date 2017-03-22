@@ -6,7 +6,7 @@ our $VERSION = '0.01_02';
 
 =head1 NAME
 
-Net::WebSocket - WebSocket protocol basics
+Net::WebSocket - WebSocket in Perl
 
 =head1 SYNOPSIS
 
@@ -59,26 +59,25 @@ the underlying transport mechanism is up to you: it could be a file,
 a UNIX socket, ordinary TCP/IP, or whatever.
 
 As a result of this “bare-bones” approach, Net::WebSocket can probably
-fit your needs; however, it won’t interface directly with event frameworks,
-so you’ll need to write your own handling layer. There are some examples
+fit your needs; however, it won’t absolve you of the need to know the
+WebSocket protocol itself. It also doesn’t do I/O for you, but there are some
+examples
 of using L<IO::Select> for this in the distribution’s C<demo/> directory.
 
-This is not a “quick-and-cheap” solution for WebSocket support; rather,
-Net::WebSocket attempts to support the protocol as completely, usefully,
-and flexibly as possible.
+Net::WebSocket is not a “quick-and-cheap” WebSocket solution; rather,
+it attempts to support the protocol—and only that protocol—as
+completely, usefully, and flexibly as possible.
 
 =head1 OVERVIEW
 
 WebSocket is almost “two protocols for the price of one”: the
-HTTP headers for the handshake, and the framing logic for the actual data
-exchange. The HTTP headers portion is complex enough, and has enough support
-in other CPAN modules, that this distribution only provides a few basic tools
+HTTP-derived handshake logic, then the framing logic for the actual data
+exchange. The handshake portion is complex enough, and has enough support
+from CPAN’s HTTP modules, that this distribution only provides a few basic tools
 for doing the handshake. It’s enough to get you where you need to go, but
 not much more.
 
-The lion’s share of Net::WebSocket concerns the actual data exchange.
-To fit diverse usage patterns, this distribution includes logic at varying
-levels of abstraction:
+Here are the main modules:
 
 =head2 L<Net::WebSocket::Handshake::Server>
 
@@ -122,8 +121,8 @@ As per L<the specification|https://tools.ietf.org/html/rfc6455#section-5.1>,
 client serializers “MUST” mask the data randomly, whereas server serializers
 “MUST NOT” do this. Net::WebSocket does this for you automatically
 (courtesy of L<Bytes::Random::Secure::Tiny>), but you need to distinguish
-between client serializers—which do masking—and server serializers, which
-don’t mask.
+between client serializers—which mask their payloads—and server serializers,
+which don’t mask.
 
 =head2 Text vs. Binary
 
@@ -137,7 +136,7 @@ a frame, at first only a base L<Net::WebSocket::Frame> implementation is
 created. An AUTOLOAD method will “upgrade” any such frame that needs the
 specific methods of its class.
 
-=head1 EXTENDING Net::WebSocket
+=head1 EXTENSION SUPPORT
 
 The WebSocket specification describes several methods of extending the
 protocol, all of which Net::WebSocket supports:
@@ -159,6 +158,16 @@ reports as needed.
 
 =item * Apportion part of the payload data for the extension. This you
 can do in your application.
+
+=back
+
+=head1 TODO
+
+=over
+
+=item * Convert all plain C<die()>s to typed exceptions.
+
+=item * Add tests, especially for extension support.
 
 =back
 

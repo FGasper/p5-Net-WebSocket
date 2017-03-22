@@ -53,9 +53,7 @@ sub get_next_message {
 
     die "Already closed!" if $self->{'_closed'};
 
-print STDERR "EP getting frame\n";
     if ( my $frame = $self->{'_parser'}->get_next_frame() ) {
-print STDERR "EP got frame\n";
         if ($frame->is_control_frame()) {
             $self->_handle_control_frame($frame);
         }
@@ -88,7 +86,6 @@ print STDERR "EP got frame\n";
             }
         }
     }
-print STDERR "EP NO frame\n";
 
     return undef;
 }
