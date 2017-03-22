@@ -54,12 +54,14 @@ for my $t (@tests) {
 
     alarm 300;
 
-    do {
+    while (!$frame) {
         syswrite $wtr, substr( $bytes, 0, 1, q<> );
         my ($rdrs_ar) = IO::Select->select( $ios );
 
+        last if !$rdrs_ar || !@$rdrs_ar;
+
         $frame = $parser->get_next_frame();
-    } while !$frame;
+    }
 
     cmp_deeply(
         $frame,

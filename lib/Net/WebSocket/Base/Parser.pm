@@ -143,8 +143,6 @@ sub _read_with_buffer {
         my $read = $self->_read($deficit);
 
         if (length($read) < $deficit) {
-            die Net::WebSocket::X->create('EmptyRead') if !length $read;
-
             $self->{'_buffer'} .= $read;
             return undef;
         }
