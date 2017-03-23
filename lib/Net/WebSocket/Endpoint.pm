@@ -19,9 +19,10 @@ use Net::WebSocket::Frame::close ();
 use Net::WebSocket::Frame::ping ();
 use Net::WebSocket::Frame::pong ();
 use Net::WebSocket::Message ();
+use Net::WebSocket::PingStore ();
 use Net::WebSocket::X ();
 
-use constant DEFAULT_MAX_PINGS => 2;
+use constant DEFAULT_MAX_PINGS => 10;
 
 sub new {
     my ($class, %opts) = @_;
@@ -32,8 +33,11 @@ sub new {
     my $self = {
         _fragments => [],
 
-        _ping_counter => 0,
         _max_pings => $class->DEFAULT_MAX_PINGS(),
+
+        _ping_store => Net::WebSocket::PingStore->new(),
+
+        _write_func => ($opts{'out'}->blocking() ? '_write_now_then_callback' : '_enqueue_write'),
 
         (map { defined($opts{$_}) ? ( "_$_" => $opts{$_} ) : () } qw(
             parser
@@ -51,7 +55,7 @@ sub new {
 sub get_next_message {
     my ($self) = @_;
 
-    die "Already closed!" if $self->{'_closed'};
+    $self->_verify_not_closed();
 
     if ( my $frame = $self->{'_parser'}->get_next_frame() ) {
         if ($frame->is_control_frame()) {
@@ -128,29 +132,46 @@ sub _got_non_continuation_during_fragment {
     die Net::WebSocket::X->create( 'ReceivedBadControlFrame', $msg );
 }
 
-sub timeout {
+sub check_heartbeat {
     my ($self) = @_;
 
-    if ($self->{'_ping_counter'} == $self->{'_max_pings'}) {
+    my $ping_counter = $self->{'_ping_store'}->get_count();
+
+    if ($ping_counter == $self->{'_max_pings'}) {
         my $close = Net::WebSocket::Frame::close->new(
-            code => 'POLICY_VIOLATION',
             $self->FRAME_MASK_ARGS(),
+            code => 'POLICY_VIOLATION',
         );
-        print { $self->{'_out'} } $close->to_bytes();
+
+        $self->_send_frame($close);
+
         $self->{'_closed'} = 1;
     }
 
-    my $ping_message = sprintf("%s UTC: $self->{'_ping_counter'} (%s)", scalar(gmtime), rand);
-
-    $self->{'_ping_texts'}{$ping_message} = 1;
+    my $ping_message = $self->{'_ping_store'}->add();
 
     my $ping = Net::WebSocket::Frame::ping->new(
         payload_sr => \$ping_message,
         $self->FRAME_MASK_ARGS(),
     );
-    print { $self->{'_out'} } $ping->to_bytes();
 
-    $self->{'_ping_counter'}++;
+    $self->_send_frame($ping);
+
+    return;
+}
+
+sub shutdown {
+    my ($self, $reason) = @_;
+
+    my $close = Net::WebSocket::Frame::close->new(
+        $self->FRAME_MASK_ARGS(),
+        code => 'ENDPOINT_UNAVAILABLE',
+        reason => $reason,
+    );
+
+    $self->_send_frame($close);
+
+    $self->{'_closed'} = 1;
 
     return;
 }
@@ -178,18 +199,20 @@ sub on_ping {
 sub on_pong {
     my ($self, $frame) = @_;
 
-    #NB: We expect a response to any ping that we’ve sent; any pong
-    #we receive that doesn’t actually correlate to a ping we’ve sent
-    #is ignored—i.e., it doesn’t reset the ping counter. This means that
-    #we could still timeout even if we’re receiving pongs.
-    if (delete $self->{'_ping_texts'}{$frame->get_payload()}) {
-        $self->{'_ping_counter'} = 0;
-    }
+    $self->{'_ping_store'}->remove( $frame->get_payload() );
 
     return;
 }
 
 #----------------------------------------------------------------------
+
+sub _verify_not_closed {
+    my ($self) = @_;
+
+    die "Already closed!" if $self->{'_closed'};
+
+    return;
+}
 
 sub _handle_control_frame {
     my ($self, $frame) = @_;
@@ -236,7 +259,19 @@ sub _send_frame {
         $self->_before_send_frame($frame);
     }
 
-    print { $self->{'_out'} } $frame->to_bytes();
+    local $!;
+
+  WRITE: {
+        syswrite( $self->{'_out'}, $frame->to_bytes() ) or do {
+            if ($!) {
+                redo WRITE if $!{'EINTR'};
+                die "write err: [$!]";  #XXX FIXME
+            }
+            else {
+                die Net::WebSocket::X->create('EmptyRead');
+            }
+        };
+    }
 
     return;
 }

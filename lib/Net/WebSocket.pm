@@ -38,7 +38,7 @@ Net::WebSocket - WebSocket in Perl
 
     #… or, if we timeout while waiting for $inet be ready for reading:
 
-    $ept->timeout();
+    $ept->check_heartbeat();
     exit if $ept->is_closed();
 
 =head1 ALPHA QUALITY
@@ -53,7 +53,7 @@ neither are they out of the question. Change the changelog before updating!
 =head1 DESCRIPTION
 
 This distribution provides a set of fundamental tools for communicating via
-L<https://tools.ietf.org/html/rfc6455|WebSocket>.
+L<WebSocket|https://tools.ietf.org/html/rfc6455>.
 It is only concerned with the protocol itself;
 the underlying transport mechanism is up to you: it could be a file,
 a UNIX socket, ordinary TCP/IP, or whatever.
@@ -175,6 +175,11 @@ can do in your application.
 
 L<Protocol::WebSocket> is an older module that supports
 pre-standard versions of the WebSocket protocol.
+
+L<Net::WebSocket::Server> implements only server behaviors and
+gives you more automation.
+
+L<Net::WebSocket::EV> uses XS to call a C library.
 
 =head1 REPOSITORY
 

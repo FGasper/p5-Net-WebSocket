@@ -193,7 +193,7 @@ sub _mux_after_handshake {
             }
 
             if (!$rdrs_ar && !$excs_ar) {
-                $ept->timeout();
+                $ept->check_heartbeat();
                 last if $ept->is_closed();
             }
         }

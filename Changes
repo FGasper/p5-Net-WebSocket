@@ -1,0 +1,10 @@
+Revision history for Perl module Net::WebSocket
+
+0.01 Wed Mar 22 2017
+- Initial release
+
+0.02
+- Add this Changes file. :)
+- Refactor ping handling behavior into its own module.
+- BREAKING: Rename Endpoint “timeout” method to “check_heartbeat”.
+- MAJOR BREAKING: Endpoint now defers non-blocking writes to a queue.
