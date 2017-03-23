@@ -23,7 +23,7 @@ Net::WebSocket::Endpoint::Server
     );
 
     if ( _we_timed_out_waiting_for_read_readiness() ) {
-        $ept->timeout();
+        $ept->check_heartbeat();
     }
     else {
 
@@ -99,16 +99,15 @@ a PROTOCOL_ERROR close frame.
 This method may not be called after a close frame has been sent (i.e.,
 if the C<is_closed()> method returns true).
 
-=head2 I<OBJ>->timeout()
+=head2 I<OBJ>->check_heartbeat()
 
-Records a read timeout.
+Ordinarily, sends a distinct ping frame to the remote server
+and increments the ping counter. Once a sent ping is
+received back (i.e., a pong), the ping counter gets reset.
 
 If the internal ping counter has already reached C<max_pings>, then we
-send a PROTOCOL_ERROR close frame.
-
-Otherwise, this sends a distinct ping frame and increments
-the internal ping counter. It records the ping frame’s contents internally
-so that we can match it with the corresponding pong frame.
+send a PROTOCOL_ERROR close frame. Further I/O attempts on this object
+will prompt an appropriate exception to be thrown.
 
 =head2 I<OBJ>->is_closed()
 

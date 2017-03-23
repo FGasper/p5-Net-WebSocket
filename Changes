@@ -1,0 +1,9 @@
+Revision history for Perl module Net::WebSocket
+
+0.01 Wed Mar 22 2017
+- Initial release
+
+0.02
+- Add this Changes file. :)
+- BREAKING: Rename Endpoint “timeout” method to “check_heartbeat”.
+- Fix missing Call::Context dependency.

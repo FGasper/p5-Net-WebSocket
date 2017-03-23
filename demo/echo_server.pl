@@ -81,7 +81,7 @@ while ( my $sock = $server->accept() ) {
         }
 
         if (!$rdrs_ar && !$errs_ar) {
-            $ept->timeout();
+            $ept->check_heartbeat();
             last if $ept->is_closed();
             next;
         }

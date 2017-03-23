@@ -128,7 +128,7 @@ sub _got_non_continuation_during_fragment {
     die Net::WebSocket::X->create( 'ReceivedBadControlFrame', $msg );
 }
 
-sub timeout {
+sub check_heartbeat {
     my ($self) = @_;
 
     if ($self->{'_ping_counter'} == $self->{'_max_pings'}) {

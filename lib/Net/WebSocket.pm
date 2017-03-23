@@ -38,7 +38,7 @@ Net::WebSocket - WebSocket in Perl
 
     #… or, if we timeout while waiting for $inet be ready for reading:
 
-    $ept->timeout();
+    $ept->check_heartbeat();
     exit if $ept->is_closed();
 
 =head1 ALPHA QUALITY
