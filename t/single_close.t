@@ -12,8 +12,6 @@ use File::Temp ();
 use Net::WebSocket::Parser;
 use Net::WebSocket::Mask ();
 
-use Carp::Always;
-
 my @tests = (
     [
         'empty',
