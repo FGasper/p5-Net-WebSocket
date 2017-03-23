@@ -19,6 +19,7 @@ WriteMakefile(
         'Digest::SHA' => 0,
         'URI::Split' => 0,
         'Bytes::Random::Secure::Tiny' => 0,
+        'Call::Context' => 0,
     },
     META_MERGE => {
         'meta-spec' => { version => 2 },

@@ -106,7 +106,12 @@ and increments the ping counter. Once a sent ping is
 received back (i.e., a pong), the ping counter gets reset.
 
 If the internal ping counter has already reached C<max_pings>, then we
+<<<<<<< HEAD
 send a PROTOCOL_ERROR close frame.
+=======
+send a PROTOCOL_ERROR close frame. Further I/O attempts on this object
+will prompt an appropriate exception to be thrown.
+>>>>>>> master
 
 =head2 I<OBJ>->is_closed()
 

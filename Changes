@@ -3,8 +3,20 @@ Revision history for Perl module Net::WebSocket
 0.01 Wed Mar 22 2017
 - Initial release
 
-0.02
+0.02 Thu Mar 23 2017
 - Add this Changes file. :)
-- Refactor ping handling behavior into its own module.
+
 - BREAKING: Rename Endpoint “timeout” method to “check_heartbeat”.
-- MAJOR BREAKING: Endpoint now defers non-blocking writes to a queue.
+
+- Fix missing Call::Context dependency.
+
+
+0.03
+- BREAKING: Endpoint now defers non-blocking writes to a queue.
+  Non-blocking implementations will need to account for writability
+  of the write filehandle and process the queue as needed.
+
+- Refactor ping handling behavior into its own module. It could be
+  reusable for Net::WAMP’s RawSocket support … though potentially not
+  if the WAMP specification clarifies a different behavior pattern
+  for its RawSocket ping/pong. :-/

@@ -30,6 +30,12 @@ sub new {
     my @missing = grep { !length $opts{$_} } qw( parser out );
     #die "Missing: [@missing]" if @missing;
 
+    my $out_blocking = $opts{'out'}->blocking();
+
+    if (!$out_blocking && !IO::WriteQueue->can('new')) {
+        Module::Load::load('IO::WriteQueue');
+    }
+
     my $self = {
         _fragments => [],
 
@@ -37,7 +43,10 @@ sub new {
 
         _ping_store => Net::WebSocket::PingStore->new(),
 
-        _write_func => ($opts{'out'}->blocking() ? '_write_now_then_callback' : '_enqueue_write'),
+        _write_func => ($out_blocking ? '_write_frame_now' : '_enqueue_write'),
+
+        _frames_queue => [],
+        _write_queue => !$out_blocking && IO::WriteQueue->new($opts{'out'}),
 
         (map { defined($opts{$_}) ? ( "_$_" => $opts{$_} ) : () } qw(
             parser
@@ -94,48 +103,12 @@ sub get_next_message {
     return undef;
 }
 
-sub _got_continuation_during_non_fragment {
-    my ($self, $frame) = @_;
-
-    my $msg = sprintf('Received continuation outside of fragment!');
-
-    #For now … there may be some multiplexing extension
-    #that allows some other behavior down the line,
-    #but let’s enforce standard protocol for now.
-    my $err_frame = Net::WebSocket::Frame::close->new(
-        code => 'PROTOCOL_ERROR',
-        reason => $msg,
-        $self->FRAME_MASK_ARGS(),
-    );
-
-    $self->_send_frame($err_frame);
-
-    die Net::WebSocket::X->create( 'ReceivedBadControlFrame', $msg );
-}
-
-sub _got_non_continuation_during_fragment {
-    my ($self, $frame) = @_;
-
-    my $msg = sprintf('Received %s; expected continuation!', $frame->get_type());
-
-    #For now … there may be some multiplexing extension
-    #that allows some other behavior down the line,
-    #but let’s enforce standard protocol for now.
-    my $err_frame = Net::WebSocket::Frame::close->new(
-        code => 'PROTOCOL_ERROR',
-        reason => $msg,
-        $self->FRAME_MASK_ARGS(),
-    );
-
-    $self->_send_frame($err_frame);
-
-    die Net::WebSocket::X->create( 'ReceivedBadControlFrame', $msg );
-}
-
 sub check_heartbeat {
     my ($self) = @_;
 
     my $ping_counter = $self->{'_ping_store'}->get_count();
+
+    my $write_func = $self->{'_write_func'};
 
     if ($ping_counter == $self->{'_max_pings'}) {
         my $close = Net::WebSocket::Frame::close->new(
@@ -143,7 +116,7 @@ sub check_heartbeat {
             code => 'POLICY_VIOLATION',
         );
 
-        $self->_send_frame($close);
+        $self->$write_func($close);
 
         $self->{'_closed'} = 1;
     }
@@ -155,7 +128,7 @@ sub check_heartbeat {
         $self->FRAME_MASK_ARGS(),
     );
 
-    $self->_send_frame($ping);
+    $self->$write_func($ping);
 
     return;
 }
@@ -169,7 +142,9 @@ sub shutdown {
         reason => $reason,
     );
 
-    $self->_send_frame($close);
+    my $write_func = $self->{'_write_func'};
+
+    $self->$write_func($close);
 
     $self->{'_closed'} = 1;
 
@@ -181,12 +156,37 @@ sub is_closed {
     return $self->{'_closed'} ? 1 : 0;
 }
 
+sub frames_to_write {
+    my ($self) = @_;
+
+    return 0 + @{ $self->{'_frames_queue'} };
+}
+
+sub process_write_queue {
+    my ($self) = @_;
+
+    $self->_verify_not_closed();
+
+    while ( my $qi = $self->{'_frames_queue'}[0] ) {
+        if ( $self->_write_now_then_callback( @$qi ) ) {
+            shift @{ $self->{'_frames_queue'} };
+        }
+        else {
+            last;
+        }
+    }
+
+    return;
+}
+
 #----------------------------------------------------------------------
 
 sub on_ping {
     my ($self, $frame) = @_;
 
-    $self->_send_frame(
+    my $write_func = $self->{'_write_func'};
+
+    $self->$write_func(
         Net::WebSocket::Frame::pong->new(
             payload_sr => \$frame->get_payload(),
             $self->FRAME_MASK_ARGS(),
@@ -206,6 +206,48 @@ sub on_pong {
 
 #----------------------------------------------------------------------
 
+sub _got_continuation_during_non_fragment {
+    my ($self, $frame) = @_;
+
+    my $msg = sprintf('Received continuation outside of fragment!');
+
+    #For now … there may be some multiplexing extension
+    #that allows some other behavior down the line,
+    #but let’s enforce standard protocol for now.
+    my $err_frame = Net::WebSocket::Frame::close->new(
+        code => 'PROTOCOL_ERROR',
+        reason => $msg,
+        $self->FRAME_MASK_ARGS(),
+    );
+
+    my $write_func = $self->{'_write_func'};
+
+    $self->$write_func($err_frame);
+
+    die Net::WebSocket::X->create( 'ReceivedBadControlFrame', $msg );
+}
+
+sub _got_non_continuation_during_fragment {
+    my ($self, $frame) = @_;
+
+    my $msg = sprintf('Received %s; expected continuation!', $frame->get_type());
+
+    #For now … there may be some multiplexing extension
+    #that allows some other behavior down the line,
+    #but let’s enforce standard protocol for now.
+    my $err_frame = Net::WebSocket::Frame::close->new(
+        code => 'PROTOCOL_ERROR',
+        reason => $msg,
+        $self->FRAME_MASK_ARGS(),
+    );
+
+    my $write_func = $self->{'_write_func'}
+
+    $self->$write_func($err_frame);
+
+    die Net::WebSocket::X->create( 'ReceivedBadControlFrame', $msg );
+}
+
 sub _verify_not_closed {
     my ($self) = @_;
 
@@ -222,6 +264,7 @@ sub _handle_control_frame {
     my $type = $frame->get_type();
 
     if ($type eq 'close') {
+        $self->{'_received_close'} = 1;
         $self->{'_closed'} = 1;
 
         my ($code, $reason) = $frame->get_code_and_reason();
@@ -232,9 +275,9 @@ sub _handle_control_frame {
             $self->FRAME_MASK_ARGS(),
         );
 
-        local $SIG{'PIPE'} = 'IGNORE';
+        my $write_func = $self->{'_write_func'};
 
-        $self->_send_frame($resp_frame);
+        $self->$write_func( $resp_frame );
 
         die Net::WebSocket::X->create('ReceivedClose', $frame);
     }
@@ -252,12 +295,15 @@ sub _handle_control_frame {
     return;
 }
 
-sub _send_frame {
-    my ($self, $frame) = @_;
+sub _write_now_then_callback {
+    my ($self, $frame, $todo_cr) = @_;
 
     if ($self->can('_before_send_frame')) {
         $self->_before_send_frame($frame);
     }
+
+    if ($self->{'_write_queue'}) {
+        $self->{'_write_queue'}->add( $frame->to_bytes(), $todo_cr );
 
     local $!;
 
