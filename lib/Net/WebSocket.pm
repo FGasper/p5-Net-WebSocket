@@ -1,6 +1,6 @@
 package Net::WebSocket;
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 =encoding utf-8
 
@@ -47,8 +47,8 @@ This is a preliminary release. It is not meant for
 production work, but please do play with it and see how it works for you.
 Bug reports, especially with reproducible test cases, would be very welcome!
 
-Note that while breaking changes to the interface are unlikely,
-neither are they out of the question. Change the changelog before updating!
+Breaking changes are still a possibility here, though they should be pretty
+minor.
 
 =head1 DESCRIPTION
 
