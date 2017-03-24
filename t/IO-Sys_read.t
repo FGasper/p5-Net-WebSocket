@@ -43,7 +43,7 @@ close $cw;
 
 my $start = time;
 
-my $secs = 20;
+my $secs = 8;
 
 note "Thrashing IPC for $secs seconds to test EINTR resistance …";
 

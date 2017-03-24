@@ -204,7 +204,7 @@ sub on_pong {
 sub _get_write_func {
     my ($self) = @_;
 
-    return $opts{'out'}->blocking() ? '_write_now' : '_enqueue_write';
+    return $self->{'_out'}->blocking() ? '_write_now' : '_enqueue_write';
 }
 
 sub _enqueue_write {

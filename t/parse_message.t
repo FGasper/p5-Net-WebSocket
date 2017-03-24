@@ -7,14 +7,17 @@ use autodie;
 use Test::More;
 use Test::Deep;
 
+use File::Slurp;
+use File::Temp;
+
 plan tests => 6;
 
 use Net::WebSocket::Endpoint::Server ();
 use Net::WebSocket::Parser ();
 
-my $out_buffer = q<>;
-
 my $full_buffer;
+
+(undef, my $out_path) = File::Temp::tempfile( CLEANUP => 1);
 
 my @tests = (
     [
@@ -52,7 +55,7 @@ my @tests = (
     [
         "\x89\x0bHello-ping\x0a" . "\x82\x00",
         sub {
-            open my $read_out_fh, '<', \$out_buffer;
+            open my $read_out_fh, '<', $out_path;
 
             my $out_parser = Net::WebSocket::Parser->new( $read_out_fh );
 
@@ -100,7 +103,7 @@ my @tests = (
                 'fragmented double hello with ping in the middle',
             ) or diag explain $_;
 
-            open my $read_out_fh, '<', \$out_buffer;
+            open my $read_out_fh, '<', $out_path;
 
             my $out_parser = Net::WebSocket::Parser->new( $read_out_fh );
 
@@ -118,8 +121,8 @@ my @tests = (
                         get_mask_bytes => q<>,
                     ),
                 ),
-                'ping in the middle comes out as expected',
-            ) or diag explain [$resp, sprintf( "%v.02x", $out_buffer )];
+                'ping in the middle gets a reply as expected',
+            );
         },
     ],
 );
@@ -128,7 +131,9 @@ $full_buffer = join( q<>, map { $_->[0] } @tests );
 open my $full_read_fh, '<', \$full_buffer;
 my $parser = Net::WebSocket::Parser->new( $full_read_fh );
 
-open my $out_fh, '>>', \$out_buffer;
+open my $out_fh, '>>', $out_path;
+
+$out_fh->blocking(1);
 
 my $ept = Net::WebSocket::Endpoint::Server->new(
     parser => $parser,
@@ -136,7 +141,7 @@ my $ept = Net::WebSocket::Endpoint::Server->new(
 );
 
 for my $t (@tests) {
-    substr( $out_buffer, 0 ) = q<>;
+    truncate $out_fh, 0;
 
     my $msg;
 
