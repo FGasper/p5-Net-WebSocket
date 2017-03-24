@@ -112,6 +112,8 @@ sub get_next_frame {
             $class = $cr->();
         }
         else {
+
+            #Untyped because this is a coding error.
             die "$self: Unrecognized frame opcode: “$opcode”";
         }
 
