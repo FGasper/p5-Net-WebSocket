@@ -15,7 +15,13 @@ my $start = 'We have come to dedicate a portion of that field as a final resting
 
 my $start_copy = $start;
 
-pipe( my $rdr, my $wtr );
+my ($rdr, $wtr);
+my $content; #for Windows
+if ($^O eq 'MSWin32') { #hangs on Windows if pipe is used
+    open $wtr,'>',\$content;
+} else {
+    pipe( $rdr, $wtr );
+}
 
 while (my $chunk = substr($start_copy, 0, 25, q<>)) {
     my $streamer = Net::WebSocket::Streamer::Client->new('text');
@@ -28,6 +34,9 @@ while (my $chunk = substr($start_copy, 0, 25, q<>)) {
 }
 
 close $wtr;
+if ($^O eq 'MSWin32') {
+    open $rdr,'<',\$content;
+}
 
 my $parse = Net::WebSocket::Parser->new( $rdr );
 
