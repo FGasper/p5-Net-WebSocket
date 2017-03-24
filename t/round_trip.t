@@ -4,8 +4,6 @@ use strict;
 use warnings;
 use autodie;
 
-use Carp::Always;   #XXX
-
 use Test::More;
 
 plan tests => 1;

@@ -131,11 +131,6 @@ sub _mux_after_handshake {
         $buf,
     );
 
-    my $ept = Net::WebSocket::Endpoint::Client->new(
-        out => $inet,
-        parser => $parser,
-    );
-
     for my $sig (ERROR_SIGS()) {
         $SIG{$sig} = sub {
             my ($the_sig) = @_;
@@ -158,10 +153,28 @@ sub _mux_after_handshake {
     if ( -t $from_caller ) {
         $_->blocking(0) for ($from_caller, $inet);
 
+        #start it as non-blocking
+        my $ept = Net::WebSocket::Endpoint::Client->new(
+            out => $inet,
+            parser => $parser,
+        );
+
         my $s = IO::Select->new( $from_caller, $inet );
+        my $write_s = IO::Select->new($inet);
 
         while (1) {
-            my ($rdrs_ar, undef, $excs_ar) = IO::Select->select( $s, undef, $s, 10 );
+            my $cur_write_s = $ept->frames_to_write() ? $write_s : undef;
+
+print "SELECT\n";
+use Data::Dumper;
+print Dumper( 'select', $cur_write_s );
+            my ($rdrs_ar, $wtrs_ar, $excs_ar) = IO::Select->select( $s, $cur_write_s, $s, 3 );
+
+            #There’s only one possible.
+            if ($wtrs_ar && @$wtrs_ar) {
+print "WRITING\n";
+                $ept->process_write_queue();
+            }
 
             for my $err (@$excs_ar) {
                 $s->remove($err);
@@ -192,13 +205,23 @@ sub _mux_after_handshake {
                 }
             }
 
-            if (!$rdrs_ar && !$excs_ar) {
+use Data::Dumper;
+print STDERR Dumper( $rdrs_ar, $wtrs_ar, $excs_ar );
+            if (!@$rdrs_ar && !($wtrs_ar && @$wtrs_ar) && !@$excs_ar) {
+print "heartbeat …\n";
                 $ept->check_heartbeat();
                 last if $ept->is_closed();
             }
         }
     }
     else {
+
+        #non-blocking
+        my $ept = Net::WebSocket::Endpoint::Client->new(
+            out => $inet,
+            parser => $parser,
+        );
+
         while ( sysread $from_caller, my $buf, 32768 ) {
             _chunk_to_remote( $buf, $inet );
         }

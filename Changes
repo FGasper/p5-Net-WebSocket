@@ -10,6 +10,8 @@ Revision history for Perl module Net::WebSocket
 
 - Fix missing Call::Context dependency.
 
+0.021 Thu Mar 23 2017
+- Remove stray Call::Always usage in tests
 
 0.03
 - BREAKING: Endpoint now defers non-blocking writes to a queue.
@@ -17,6 +19,7 @@ Revision history for Perl module Net::WebSocket
   of the write filehandle and process the queue as needed.
 
 - Refactor ping handling behavior into its own module. It could be
-  reusable for Net::WAMP’s RawSocket support … though potentially not
-  if the WAMP specification clarifies a different behavior pattern
-  for its RawSocket ping/pong. :-/
+  reusable potentially …
+
+- Refactor write logic into IO::WriteQueue and IO::Syswrite. Both of these
+  are good candidates for separate distribution.

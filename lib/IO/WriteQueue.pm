@@ -10,6 +10,8 @@ use IO::Syswrite ();
 sub new {
     my ($class, $out_fh) = @_;
 
+    die 'Need a filehandle!' if !$out_fh;
+
     return bless { _out_fh => $out_fh, _queue => [] }, shift;
 }
 
@@ -34,6 +36,11 @@ sub process {
     }
 }
 
+sub count {
+    my ($self) = @_;
+    return 0 + @{ $self->{'_queue'} };
+}
+
 my $wrote;
 
 sub _write_now_then_callback {
@@ -41,7 +48,7 @@ sub _write_now_then_callback {
 
     local $!;
 
-    my $wrote = IO::Syswrite::write_all( $self->{'_out_fh'}, $_[0] ) or do {
+    $wrote = IO::Syswrite::write_all( $self->{'_out_fh'}, $_[0] ) or do {
         die IO::WriteQueue::X->create('WriteError', $!) if $!;
     };
 

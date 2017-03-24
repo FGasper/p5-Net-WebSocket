@@ -72,8 +72,14 @@ while ( my $sock = $server->accept() ) {
         },
     );
 
+    my $write_select = IO::Select->new($inet);
+
     while (!$ept->is_closed()) {
-        my ( $rdrs_ar, undef, $errs_ar ) = IO::Select->select( $s, undef, $s, 10 );
+        my $cur_write_s = $ept->frames_to_write() ? $write_select : undef;
+
+        my ( $rdrs_ar, $wtrs_ar, $errs_ar ) = IO::Select->select( $s, $cur_write_s, $s, 10 );
+
+        $ept->process_write_queue() if $wtrs_ar && @$wtrs_ar;
 
         if ($errs_ar && @$errs_ar) {
             $s->remove($sock);

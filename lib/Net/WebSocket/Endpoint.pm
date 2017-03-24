@@ -15,6 +15,8 @@ See L<Net::WebSocket::Endpoint::Server>.
 use strict;
 use warnings;
 
+use IO::Syswrite ();
+
 use Net::WebSocket::Frame::close ();
 use Net::WebSocket::Frame::ping ();
 use Net::WebSocket::Frame::pong ();
@@ -43,7 +45,7 @@ sub new {
 
         _ping_store => Net::WebSocket::PingStore->new(),
 
-        _write_func => ($out_blocking ? '_write_frame_now' : '_enqueue_write'),
+        _write_func => ($out_blocking ? '_write_now' : '_enqueue_write'),
 
         _frames_queue => [],
         _write_queue => !$out_blocking && IO::WriteQueue->new($opts{'out'}),
@@ -159,7 +161,7 @@ sub is_closed {
 sub frames_to_write {
     my ($self) = @_;
 
-    return 0 + @{ $self->{'_frames_queue'} };
+    return ($self->{'_partially_written_frame'} || 0) + @{ $self->{'_frames_queue'} };
 }
 
 sub process_write_queue {
@@ -167,13 +169,15 @@ sub process_write_queue {
 
     $self->_verify_not_closed();
 
-    while ( my $qi = $self->{'_frames_queue'}[0] ) {
-        if ( $self->_write_now_then_callback( @$qi ) ) {
-            shift @{ $self->{'_frames_queue'} };
+    if ($self->{'_partially_written_frame'}) {
+        if ( $self->_write_bytes_no_prehook( @{ $self->{'_partially_written_frame'} } ) ) {
+            undef $self->{'_partially_written_frame'};
         }
-        else {
-            last;
-        }
+    }
+    else {
+        my $qi = shift @{ $self->{'_frames_queue'} } or die 'process_write_queue() on empty!';
+
+        $self->_write_now( @$qi );
     }
 
     return;
@@ -199,12 +203,21 @@ sub on_ping {
 sub on_pong {
     my ($self, $frame) = @_;
 
+printf "GOT PONG: [%s]\n", $frame->get_payload();
     $self->{'_ping_store'}->remove( $frame->get_payload() );
 
     return;
 }
 
 #----------------------------------------------------------------------
+
+sub _enqueue_write {
+    my $self = shift;
+
+    push @{ $self->{'_frames_queue'} }, \@_;
+
+    return;
+}
 
 sub _got_continuation_during_non_fragment {
     my ($self, $frame) = @_;
@@ -241,7 +254,7 @@ sub _got_non_continuation_during_fragment {
         $self->FRAME_MASK_ARGS(),
     );
 
-    my $write_func = $self->{'_write_func'}
+    my $write_func = $self->{'_write_func'};
 
     $self->$write_func($err_frame);
 
@@ -295,29 +308,31 @@ sub _handle_control_frame {
     return;
 }
 
-sub _write_now_then_callback {
+sub _write_now {
     my ($self, $frame, $todo_cr) = @_;
 
     if ($self->can('_before_send_frame')) {
         $self->_before_send_frame($frame);
     }
 
-    if ($self->{'_write_queue'}) {
-        $self->{'_write_queue'}->add( $frame->to_bytes(), $todo_cr );
+    return $self->_write_bytes_no_prehook($frame->to_bytes(), $todo_cr);
+}
+
+sub _write_bytes_no_prehook {
+    my $self = $_[0];
 
     local $!;
 
-  WRITE: {
-        syswrite( $self->{'_out'}, $frame->to_bytes() ) or do {
-            if ($!) {
-                redo WRITE if $!{'EINTR'};
-                die "write err: [$!]";  #XXX FIXME
-            }
-            else {
-                die Net::WebSocket::X->create('EmptyRead');
-            }
-        };
+    my $wrote = IO::Syswrite::write_all( $self->{'_out'}, $_[1] );
+
+    #Full success:
+    if ($wrote == length $_[1]) {
+        $_[2]->() if $_[2];
+        return 1;
     }
+
+    #Partial write; we need to come back to this one.
+    $self->{'_partially_written_frame'} = [ substr( $_[1], $wrote ), $_[2] ];
 
     return;
 }
