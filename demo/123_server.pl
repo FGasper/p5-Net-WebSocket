@@ -69,7 +69,7 @@ while ( my $sock = $server->accept() ) {
     my $cur_number = 0;
 
     while (!$ept->is_closed()) {
-        my $write_s = $ept->frames_to_write() ? $s : undef;
+        my $write_s = $ept->get_write_queue_size() ? $s : undef;
 
         my ( $rdrs_ar, $wtrs_ar, $errs_ar ) = IO::Select->select( $s, $write_s, $s, 1 );
 

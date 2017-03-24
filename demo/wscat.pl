@@ -165,7 +165,7 @@ sub _mux_after_handshake {
         my $write_s = IO::Select->new($inet);
 
         while (1) {
-            my $cur_write_s = $ept->frames_to_write() ? $write_s : undef;
+            my $cur_write_s = $ept->get_write_queue_size() ? $write_s : undef;
 
             #This is a really short timeout, btw.
             my ($rdrs_ar, $wtrs_ar, $excs_ar) = IO::Select->select( $s, $cur_write_s, $s, 3 );

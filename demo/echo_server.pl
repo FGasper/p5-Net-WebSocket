@@ -82,7 +82,7 @@ while ( my $sock = $server->accept() ) {
     my $write_select = IO::Select->new($sock);
 
     while (!$ept->is_closed()) {
-        my $cur_write_s = $ept->frames_to_write() ? $write_select : undef;
+        my $cur_write_s = $ept->get_write_queue_size() ? $write_select : undef;
 
         my ( $rdrs_ar, $wtrs_ar, $errs_ar ) = IO::Select->select( $s, $cur_write_s, $s, 10 );
 

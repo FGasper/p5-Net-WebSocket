@@ -15,7 +15,7 @@ See L<Net::WebSocket::Endpoint::Server>.
 use strict;
 use warnings;
 
-use IO::Syswrite ();
+use IO::Sys ();
 
 use Net::WebSocket::Frame::close ();
 use Net::WebSocket::Frame::ping ();
@@ -149,10 +149,16 @@ sub is_closed {
     return $self->{'_closed'} ? 1 : 0;
 }
 
-sub frames_to_write {
+sub get_write_queue_size {
     my ($self) = @_;
 
     return ($self->{'_partially_written_frame'} || 0) + @{ $self->{'_frames_queue'} };
+}
+
+sub shift_write_queue {
+    my ($self) = @_;
+
+    return shift @{ $self->{'_frames_queue'} };
 }
 
 sub process_write_queue {
@@ -319,7 +325,7 @@ sub _write_bytes_no_prehook {
 
     local $!;
 
-    my $wrote = IO::Syswrite::write_all( $self->{'_out'}, $_[1] );
+    my $wrote = IO::Sys::write( $self->{'_out'}, $_[1] );
 
     #Full success:
     if ($wrote == length $_[1]) {

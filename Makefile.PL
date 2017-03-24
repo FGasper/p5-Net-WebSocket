@@ -9,6 +9,10 @@ WriteMakefile(
     AUTHOR       => 'Felipe Gasper',
     ABSTRACT_FROM => 'lib/Net/WebSocket.pm',
     LICENSE      => 'perl',
+
+    #Bleh. Hopefully can improve.
+    MIN_PERL_VERSION => 5.014000,
+
     PREREQ_PM    => {
         'autodie'                  => 0,
         'parent'                   => 0,

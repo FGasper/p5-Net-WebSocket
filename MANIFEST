@@ -8,8 +8,6 @@ demo/echo_server.pl
 demo/lib/NWDemo.pm
 demo/wscat.pl
 lib/IO/Sys.pm
-lib/IO/Syswrite.pm
-lib/IO/WriteQueue.pm
 lib/Net/WebSocket.pm
 lib/Net/WebSocket/Base/ControlFrame.pm
 lib/Net/WebSocket/Base/DataFrame.pm

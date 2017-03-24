@@ -19,7 +19,7 @@ Revision history for Perl module Net::WebSocket
   of the write filehandle and process the queue as needed.
 
 - Refactor ping handling behavior into its own module. It could be
-  reusable potentially …
+  reusable potentially?
 
-- Refactor write logic into IO::WriteQueue and IO::Syswrite. Both of these
-  are good candidates for separate distribution.
+- Refactor read and write logic into IO::Sys. This would be a
+  good candidate for separate distribution.

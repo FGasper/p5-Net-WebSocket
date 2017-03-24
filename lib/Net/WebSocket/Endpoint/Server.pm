@@ -29,7 +29,8 @@ Net::WebSocket::Endpoint::Server
 
         #Only necessary for non-blocking I/O;
         #it’s meaningless in blocking I/O.
-        if ( $ept->frames_to_write() ) {
+        #See below for an alternative pattern for use with POE, etc.
+        if ( $ept->get_write_queue_size() ) {
             $ept->process_write_queue();
         }
 
@@ -37,6 +38,13 @@ Net::WebSocket::Endpoint::Server
         #For example, in non-blocking I/O you’ll need a select() in front
         #of this. (Blocking I/O can just call it and wait!)
         $ept->get_next_message();
+
+        #INSTEAD OF process_write_queue(), you might want to send the write
+        #queue off to a multiplexing framework like POE, for which this
+        #would be useful:
+        while ( my $frame = $ept->shift_write_queue() ) {
+            #… do something with $frame->to_bytes()
+        }
 
         #Check for this at the end of each cycle.
         _custom_logic_to_finish_up() if $ept->is_closed();
