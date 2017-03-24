@@ -27,6 +27,12 @@ Net::WebSocket::Endpoint::Server
     }
     else {
 
+        #Only necessary for non-blocking I/O;
+        #it’s meaningless in blocking I/O.
+        if ( $ept->frames_to_write() ) {
+            $ept->process_write_queue();
+        }
+
         #This should only be called when reading won’t produce an error.
         #For example, in non-blocking I/O you’ll need a select() in front
         #of this. (Blocking I/O can just call it and wait!)
@@ -98,6 +104,18 @@ a PROTOCOL_ERROR close frame.
 
 This method may not be called after a close frame has been sent (i.e.,
 if the C<is_closed()> method returns true).
+
+B<NOTE:> If the “out” file handle given to the constructor is in
+non-blocking mode, then any response frames will be queued rather than
+sent immediately. That’s where the next method comes in …
+
+=head2 I<OBJ>->process_write_queue()
+
+This is only useful in non-blocking I/O contexts.
+
+This will attempt to flush one frame from the write queue. If only part
+of the message is written, then the next call to this method will resume
+the output of that message.
 
 =head2 I<OBJ>->check_heartbeat()
 

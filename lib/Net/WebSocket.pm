@@ -56,13 +56,14 @@ This distribution provides a set of fundamental tools for communicating via
 L<WebSocket|https://tools.ietf.org/html/rfc6455>.
 It is only concerned with the protocol itself;
 the underlying transport mechanism is up to you: it could be a file,
-a UNIX socket, ordinary TCP/IP, or whatever.
+a UNIX socket, ordinary TCP/IP, some funky C<tie()>d object, or whatever.
 
-As a result of this “bare-bones” approach, Net::WebSocket can probably
-fit your needs; however, it won’t absolve you of the need to know the
-WebSocket protocol itself. It also doesn’t do I/O for you, but there are some
-examples
-of using L<IO::Select> for this in the distribution’s C<demo/> directory.
+Net::WebSocket also “has no opinions” about how you should do I/O or HTTP
+headers. As a result of this “bare-bones” approach, Net::WebSocket can likely
+fit your project; however, it won’t absolve you of the need to know the
+WebSocket protocol itself. There are some examples
+of how you might write complete applications (client or server)
+in the distribution’s C<demo/> directory.
 
 Net::WebSocket is not a “quick-and-cheap” WebSocket solution; rather,
 it attempts to support the protocol—and only that protocol—as
@@ -73,9 +74,9 @@ completely, usefully, and flexibly as possible.
 WebSocket is almost “two protocols for the price of one”: the
 HTTP-derived handshake logic, then the framing logic for the actual data
 exchange. The handshake portion is complex enough, and has enough support
-from CPAN’s HTTP modules, that this distribution only provides a few basic tools
-for doing the handshake. It’s enough to get you where you need to go, but
-not much more.
+from CPAN’s HTTP modules, that this distribution only provides a few basic
+tools—the WebSocket-specific stuff, mostly—for doing the handshake.
+It’s enough to get you where you need to go, but not much more.
 
 Here are the main modules:
 

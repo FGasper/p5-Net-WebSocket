@@ -32,12 +32,6 @@ sub new {
     my @missing = grep { !length $opts{$_} } qw( parser out );
     #die "Missing: [@missing]" if @missing;
 
-    my $out_blocking = $opts{'out'}->blocking();
-
-    if (!$out_blocking && !IO::WriteQueue->can('new')) {
-        Module::Load::load('IO::WriteQueue');
-    }
-
     my $self = {
         _fragments => [],
 
@@ -45,10 +39,7 @@ sub new {
 
         _ping_store => Net::WebSocket::PingStore->new(),
 
-        _write_func => ($out_blocking ? '_write_now' : '_enqueue_write'),
-
         _frames_queue => [],
-        _write_queue => !$out_blocking && IO::WriteQueue->new($opts{'out'}),
 
         (map { defined($opts{$_}) ? ( "_$_" => $opts{$_} ) : () } qw(
             parser
@@ -110,7 +101,7 @@ sub check_heartbeat {
 
     my $ping_counter = $self->{'_ping_store'}->get_count();
 
-    my $write_func = $self->{'_write_func'};
+    my $write_func = $self->_get_write_func();
 
     if ($ping_counter == $self->{'_max_pings'}) {
         my $close = Net::WebSocket::Frame::close->new(
@@ -144,7 +135,7 @@ sub shutdown {
         reason => $reason,
     );
 
-    my $write_func = $self->{'_write_func'};
+    my $write_func = $self->_get_write_func();
 
     $self->$write_func($close);
 
@@ -188,7 +179,7 @@ sub process_write_queue {
 sub on_ping {
     my ($self, $frame) = @_;
 
-    my $write_func = $self->{'_write_func'};
+    my $write_func = $self->_get_write_func();
 
     $self->$write_func(
         Net::WebSocket::Frame::pong->new(
@@ -203,13 +194,18 @@ sub on_ping {
 sub on_pong {
     my ($self, $frame) = @_;
 
-printf "GOT PONG: [%s]\n", $frame->get_payload();
     $self->{'_ping_store'}->remove( $frame->get_payload() );
 
     return;
 }
 
 #----------------------------------------------------------------------
+
+sub _get_write_func {
+    my ($self) = @_;
+
+    return $opts{'out'}->blocking() ? '_write_now' : '_enqueue_write';
+}
 
 sub _enqueue_write {
     my $self = shift;
@@ -233,7 +229,7 @@ sub _got_continuation_during_non_fragment {
         $self->FRAME_MASK_ARGS(),
     );
 
-    my $write_func = $self->{'_write_func'};
+    my $write_func = $self->_get_write_func();
 
     $self->$write_func($err_frame);
 
@@ -254,7 +250,7 @@ sub _got_non_continuation_during_fragment {
         $self->FRAME_MASK_ARGS(),
     );
 
-    my $write_func = $self->{'_write_func'};
+    my $write_func = $self->_get_write_func();
 
     $self->$write_func($err_frame);
 
@@ -288,7 +284,7 @@ sub _handle_control_frame {
             $self->FRAME_MASK_ARGS(),
         );
 
-        my $write_func = $self->{'_write_func'};
+        my $write_func = $self->_get_write_func();
 
         $self->$write_func( $resp_frame );
 

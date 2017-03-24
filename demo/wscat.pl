@@ -15,6 +15,8 @@ use URI::Split ();
 use FindBin;
 use lib "$FindBin::Bin/../lib";
 
+use IO::Sys ();
+
 use Net::WebSocket::Endpoint::Client ();
 use Net::WebSocket::Frame::binary ();
 use Net::WebSocket::Frame::close  ();
@@ -87,7 +89,7 @@ sub _handshake_as_client {
     my $hdr = $handshake->create_header_text();
 
     #Write out the client handshake.
-    syswrite( $inet, $hdr . CRLF );
+    IO::Sys::write( $inet, $hdr . CRLF );
 
     my $handshake_ok;
 
@@ -95,7 +97,7 @@ sub _handshake_as_client {
 
     #Read the server handshake.
     my $idx;
-    while ( sysread $inet, $buf, MAX_CHUNK_SIZE, length $buf ) {
+    while ( IO::Sys::read($inet, $buf, MAX_CHUNK_SIZE, length $buf ) ) {
         $idx = index($buf, CRLF . CRLF);
         last if -1 != $idx;
     }
@@ -142,7 +144,7 @@ sub _mux_after_handshake {
                 mask => Net::WebSocket::Mask::create(),
             );
 
-            syswrite( $inet, $frame->to_bytes() );
+            IO::Sys::write( $inet, $frame->to_bytes() );
 
             $SIG{$the_sig} = 'DEFAULT';
 
@@ -165,14 +167,11 @@ sub _mux_after_handshake {
         while (1) {
             my $cur_write_s = $ept->frames_to_write() ? $write_s : undef;
 
-print "SELECT\n";
-use Data::Dumper;
-print Dumper( 'select', $cur_write_s );
+            #This is a really short timeout, btw.
             my ($rdrs_ar, $wtrs_ar, $excs_ar) = IO::Select->select( $s, $cur_write_s, $s, 3 );
 
             #There’s only one possible.
             if ($wtrs_ar && @$wtrs_ar) {
-print "WRITING\n";
                 $ept->process_write_queue();
             }
 
@@ -192,12 +191,12 @@ print "WRITING\n";
 
             for my $rdr (@$rdrs_ar) {
                 if ($rdr == $from_caller) {
-                    sysread $from_caller, my $buf, 32768;
+                    IO::Sys::read( $from_caller, my $buf, 32768 );
                     _chunk_to_remote($buf, $inet);
                 }
                 elsif ($rdr == $inet) {
                     if ( my $msg = $ept->get_next_message() ) {
-                        syswrite( $to_caller, $msg->get_payload() );
+                        IO::Sys::write( $to_caller, $msg->get_payload() );
                     }
                 }
                 else {
@@ -205,10 +204,7 @@ print "WRITING\n";
                 }
             }
 
-use Data::Dumper;
-print STDERR Dumper( $rdrs_ar, $wtrs_ar, $excs_ar );
             if (!@$rdrs_ar && !($wtrs_ar && @$wtrs_ar) && !@$excs_ar) {
-print "heartbeat …\n";
                 $ept->check_heartbeat();
                 last if $ept->is_closed();
             }
@@ -216,13 +212,13 @@ print "heartbeat …\n";
     }
     else {
 
-        #non-blocking
+        #blocking
         my $ept = Net::WebSocket::Endpoint::Client->new(
             out => $inet,
             parser => $parser,
         );
 
-        while ( sysread $from_caller, my $buf, 32768 ) {
+        while ( IO::Sys::read($from_caller, my $buf, 32768 ) ) {
             _chunk_to_remote( $buf, $inet );
         }
 
@@ -231,13 +227,13 @@ print "heartbeat …\n";
             mask => Net::WebSocket::Mask::create(),
         );
 
-        syswrite( $inet, $close_frame->to_bytes() );
+        IO::Sys::write( $inet, $close_frame->to_bytes() );
 
         shutdown $inet, Socket::SHUT_WR();
 
         try {
             while ( my $msg = $ept->get_next_message() ) {
-                syswrite( $to_caller, $msg->get_payload() );
+                IO::Sys::write( $to_caller, $msg->get_payload() );
             }
         }
         catch {
@@ -262,7 +258,7 @@ print "heartbeat …\n";
 sub _chunk_to_remote {
     my ($buf, $out_fh) = @_;
 
-    syswrite(
+    IO::Sys::write(
         $out_fh,
         Net::WebSocket::Frame::binary->new(
             payload_sr => \$buf,
