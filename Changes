@@ -21,5 +21,4 @@ Revision history for Perl module Net::WebSocket
 - Refactor ping handling behavior into its own module. It could be
   reusable potentially?
 
-- Refactor read and write logic into IO::Sys. This would be a
-  good candidate for separate distribution.
+- EINTR-trapping logic is now distributed separatedly as IO::SigGuard.

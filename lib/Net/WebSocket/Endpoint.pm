@@ -15,7 +15,8 @@ See L<Net::WebSocket::Endpoint::Server>.
 use strict;
 use warnings;
 
-use IO::Sys ();
+use Call::Context ();
+use IO::SigGuard ();
 
 use Net::WebSocket::Frame::close ();
 use Net::WebSocket::Frame::ping ();
@@ -127,12 +128,12 @@ sub check_heartbeat {
 }
 
 sub shutdown {
-    my ($self, $reason) = @_;
+    my ($self, %opts) = @_;
 
     my $close = Net::WebSocket::Frame::close->new(
         $self->FRAME_MASK_ARGS(),
-        code => 'ENDPOINT_UNAVAILABLE',
-        reason => $reason,
+        code => $opts{'code'} || 'ENDPOINT_UNAVAILABLE',
+        reason => $opts{'reason'},
     );
 
     my $write_func = $self->_get_write_func();
@@ -152,7 +153,7 @@ sub is_closed {
 sub get_write_queue_size {
     my ($self) = @_;
 
-    return ($self->{'_partially_written_frame'} || 0) + @{ $self->{'_frames_queue'} };
+    return ($self->{'_partially_written_frame'} ? 1 : 0) + @{ $self->{'_frames_queue'} };
 }
 
 sub shift_write_queue {
@@ -167,14 +168,14 @@ sub process_write_queue {
     $self->_verify_not_closed();
 
     if ($self->{'_partially_written_frame'}) {
-        if ( $self->_write_bytes_no_prehook( @{ $self->{'_partially_written_frame'} } ) ) {
+        if ( $self->_write_bytes_no_prehook( $self->{'_partially_written_frame'} ) ) {
             undef $self->{'_partially_written_frame'};
         }
     }
     else {
         my $qi = shift @{ $self->{'_frames_queue'} } or die 'process_write_queue() on empty!';
 
-        $self->_write_now( @$qi );
+        $self->_write_now( $qi );
     }
 
     return;
@@ -216,7 +217,7 @@ sub _get_write_func {
 sub _enqueue_write {
     my $self = shift;
 
-    push @{ $self->{'_frames_queue'} }, \@_;
+    push @{ $self->{'_frames_queue'} }, $_[0];
 
     return;
 }
@@ -325,7 +326,7 @@ sub _write_bytes_no_prehook {
 
     local $!;
 
-    my $wrote = IO::Sys::write( $self->{'_out'}, $_[1] );
+    my $wrote = IO::SigGuard::syswrite( $self->{'_out'}, $_[1] );
 
     #Full success:
     if ($wrote == length $_[1]) {
@@ -334,7 +335,7 @@ sub _write_bytes_no_prehook {
     }
 
     #Partial write; we need to come back to this one.
-    $self->{'_partially_written_frame'} = [ substr( $_[1], $wrote ), $_[2] ];
+    $self->{'_partially_written_frame'} = substr( $_[1], $wrote );
 
     return;
 }

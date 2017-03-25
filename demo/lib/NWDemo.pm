@@ -6,7 +6,7 @@ use autodie;
 
 use HTTP::Request ();
 
-use IO::Sys ();
+use IO::SigGuard ();
 
 use Net::WebSocket::Handshake::Server ();
 use Net::WebSocket::Frame::close ();
@@ -22,7 +22,7 @@ sub handshake_as_server {
 
     #Read the server handshake.
     my $idx;
-    while ( IO::Sys::read($inet, $buf, MAX_CHUNK_SIZE, length $buf ) ) {
+    while ( IO::SigGuard::sysread($inet, $buf, MAX_CHUNK_SIZE, length $buf ) ) {
         $idx = index($buf, CRLF . CRLF);
         last if -1 != $idx;
     }
