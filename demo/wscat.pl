@@ -6,6 +6,8 @@ use autodie;
 
 use Try::Tiny;
 
+use lib '/Users/Felipe/code/p5-IO-SigGuard/lib';
+
 use IO::Events ();
 
 use HTTP::Response;
@@ -161,7 +163,8 @@ sub run {
             );
 
             if (my $msg = $ept->get_next_message()) {
-                syswrite( \*STDOUT, $msg->get_payload() );
+                my $payload = $msg->get_payload();
+                syswrite( \*STDOUT, substr( $payload, 0, 64, q<> ) ) while length $payload;
             }
 
             #Handle any control frames we might need to write out.

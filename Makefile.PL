@@ -6,7 +6,7 @@ use ExtUtils::MakeMaker;
 WriteMakefile(
     NAME         => 'Net::WebSocket',
     VERSION_FROM => 'lib/Net/WebSocket.pm',         # finds \$VERSION
-    AUTHOR       => 'Felipe Gasper',
+    AUTHOR       => 'Felipe Gasper (FELIPE)',
     ABSTRACT_FROM => 'lib/Net/WebSocket.pm',
     LICENSE      => 'perl',
 
@@ -24,6 +24,7 @@ WriteMakefile(
         'URI::Split' => 0,
         'Bytes::Random::Secure::Tiny' => 0,
         'Call::Context' => 0,
+        'IO::SigGuard' => 0,
     },
     META_MERGE => {
         'meta-spec' => { version => 2 },

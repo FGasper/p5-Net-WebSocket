@@ -15,6 +15,8 @@ use autodie;
 
 use Try::Tiny;
 
+use lib '/Users/Felipe/code/p5-IO-SigGuard/lib';
+
 use HTTP::Response;
 use IO::Select ();
 use IO::Socket::INET ();

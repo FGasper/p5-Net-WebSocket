@@ -119,11 +119,19 @@ sent immediately. That’s where the next method comes in …
 
 =head2 I<OBJ>->process_write_queue()
 
-This is only useful in non-blocking I/O contexts.
+This is only useful in non-blocking I/O contexts—and at that, probably
+only useful when you’re not using an event loop, since that loop will
+likely do its own write buffering.
 
 This will attempt to flush one frame from the write queue. If only part
 of the message is written, then the next call to this method will resume
 the output of that message.
+
+=head2 I<OBJ>->shift_write_queue()
+
+This is useful when you have an event loop so that you can feed the frames
+from the Endpoint object’s queue into the event loop’s write queue.
+It returns a single frame object, or undef if the queue is empty.
 
 =head2 I<OBJ>->check_heartbeat()
 
@@ -132,12 +140,8 @@ and increments the ping counter. Once a sent ping is
 received back (i.e., a pong), the ping counter gets reset.
 
 If the internal ping counter has already reached C<max_pings>, then we
-<<<<<<< HEAD
-send a PROTOCOL_ERROR close frame.
-=======
 send a PROTOCOL_ERROR close frame. Further I/O attempts on this object
 will prompt an appropriate exception to be thrown.
->>>>>>> master
 
 =head2 I<OBJ>->is_closed()
 
