@@ -87,7 +87,8 @@ sub run {
         on_tick => sub {
             $ept->check_heartbeat();
 
-            #Handle any control frames we might need to write out.
+            #Handle any control frames we might need to write out,
+            #esp. pings.
             while ( my $frame = $ept->shift_write_queue() ) {
                 $handle->write($frame->to_bytes());
             }
@@ -176,6 +177,8 @@ sub run {
         },
     );
 
+    my $closed;
+
     my $stdin = IO::Events::stdin->new(
         owner => $loop,
         read => 1,
@@ -189,11 +192,20 @@ sub run {
 
             $handle->write($frame->to_bytes());
         },
+
+        on_close => sub {
+            $closed = 1;
+        },
+
+        on_error => sub {
+            print STDERR "ERROR\n";
+        },
     );
 
     for my $sig (ERROR_SIGS()) {
         $SIG{$sig} = sub {
             my ($the_sig) = @_;
+print STDERR "Got SIG$the_sig\n";
 
             my $code = ($the_sig eq 'INT') ? 'SUCCESS' : 'ENDPOINT_UNAVAILABLE';
 
@@ -212,5 +224,7 @@ sub run {
         };
     }
 
-    $loop->yield() while 1;
+    $loop->yield() while !$closed;
+
+    $loop->flush();
 }

@@ -26,6 +26,11 @@ use Net::WebSocket::Frame::continuation ();
 use Net::WebSocket::Handshake::Server ();
 use Net::WebSocket::Parser ();
 
+use IO::Pty ();
+
+#for setsid()
+use POSIX ();
+
 my $host_port = $ARGV[0] || die "Need host:port or port!\n";
 
 if (index($host_port, ':') == -1) {
@@ -63,22 +68,30 @@ while ( my $sock = $server->accept() ) {
 
     my $sent_ping;
 
-    socketpair(my $csock, my $psock, AF_UNIX, SOCK_STREAM, PF_UNSPEC);
+    my $pty = IO::Pty->new();
+
+    my $shell = (getpwuid $>)[8] or die "No shell!";
 
     my $cpid = fork or do {
         eval {
-            close $psock;
-            open \*STDIN, '<&=', $csock;
-            open \*STDOUT, '>&=', $csock;
-            open \*STDERR, '>&=', $csock;
+            my $slv = $pty->slave();
+            open \*STDIN, '<&=', $slv;
+            open \*STDOUT, '>&=', $slv;
+            open \*STDERR, '>&=', $slv;
 
-            exec '/bin/bash';
+            #Necessary for CTRL-C and CTRL-\ to work.
+            POSIX::setsid();
+
+            #Any advantage to these??
+            #setpgrp;
+            #$pty->make_slave_controlling_terminal();
+
+            #Dunno if all shells have a “--login” switch …
+            exec { $shell } $shell, '--login';
         };
         warn if $@;
         exit( $@ ? 1 : 0 );
     };
-
-    close $csock;
 
     my $loop = IO::Events::Loop->new();
 
@@ -86,7 +99,7 @@ while ( my $sock = $server->accept() ) {
 
     my $shell_hdl = IO::Events::Handle->new(
         owner => $loop,
-        handle => $psock,
+        handle => $pty,
         read => 1,
         write => 1,
 
@@ -96,10 +109,13 @@ while ( my $sock = $server->accept() ) {
                 payload_sr => \$self->read(),
             );
 
-use Data::Dumper;
-print STDERR Dumper( "sending to client", $frame->get_payload() );
+            #printf STDERR "to client: %s\n", ($frame->to_bytes() =~ s<([\x80-\xff])><sprintf '\x%02x', ord $1>gre);
+            #printf STDERR "to client: %v.02x\n", $frame->get_payload();
+
             $client_hdl->write($frame->to_bytes());
         },
+
+        pid => $cpid,
     );
 
     my $read_buf = q<>;
@@ -122,32 +138,24 @@ print STDERR Dumper( "sending to client", $frame->get_payload() );
             $read_buf .= $self->read();
 
             if (my $msg = $ept->get_next_message()) {
+
+                #printf STDERR "from client: %s\n", ($msg->get_payload() =~ s<([\x80-\xff])><sprintf '\x%02x', ord $1>gre);
+                #printf STDERR "from client: %v.02x\n", $msg->get_payload();
+
                 $shell_hdl->write( $msg->get_payload() );
             }
         },
     );
 
-#    for my $sig (ERROR_SIGS()) {
-#        $SIG{$sig} = sub {
-#            my ($the_sig) = @_;
-#
-#            my $code = ($the_sig eq 'INT') ? 'SUCCESS' : 'ENDPOINT_UNAVAILABLE';
-    $loop->yield() while 1;
-#
-#            $ept->shutdown( code => $code );
-#
-#            while ( my $frame = $ept->shift_write_queue() ) {
-#                $handle->write($frame->to_bytes());
-#            }
-#
-#            local $SIG{'PIPE'} = 'IGNORE';
-#            $handle->flush();
-#
-#            $SIG{$the_sig} = 'DEFAULT';
-#
-#            kill $the_sig, $$;
-#        };
-#    }
+    try {
+        $loop->yield() while 1;
+    }
+    catch {
+        if ( !try { $_->isa('Net::WebSocket::X::ReceivedClose') } ) {
+            local $@ = $_;
+            die;
+        }
 
-    $loop->yield() while 1;
+        $loop->flush();
+    };
 }
