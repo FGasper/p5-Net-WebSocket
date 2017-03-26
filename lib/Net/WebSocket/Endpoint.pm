@@ -25,12 +25,12 @@ use Net::WebSocket::Message ();
 use Net::WebSocket::PingStore ();
 use Net::WebSocket::X ();
 
-use constant DEFAULT_MAX_PINGS => 10;
+use constant DEFAULT_MAX_PINGS => 3;
 
 sub new {
     my ($class, %opts) = @_;
 
-    my @missing = grep { !length $opts{$_} } qw( parser out );
+    my @missing = grep { !length $opts{$_} } qw( parser );
     #die "Missing: [@missing]" if @missing;
 
     my $self = {
@@ -44,10 +44,11 @@ sub new {
 
         (map { defined($opts{$_}) ? ( "_$_" => $opts{$_} ) : () } qw(
             parser
-            out
             max_pings
 
             on_data_frame
+
+            out
             before_send_control_frame
         )),
     };
@@ -211,7 +212,7 @@ sub on_pong {
 sub _get_write_func {
     my ($self) = @_;
 
-    return $self->{'_out'}->blocking() ? '_write_now' : '_enqueue_write';
+    return $self->{'_out'} ? '_write_now' : '_enqueue_write';
 }
 
 sub _enqueue_write {

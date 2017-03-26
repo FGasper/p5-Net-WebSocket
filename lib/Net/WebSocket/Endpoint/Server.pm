@@ -10,7 +10,6 @@ Net::WebSocket::Endpoint::Server
 
     my $ept = Net::WebSocket::Endpoint::Server->new(
         parser => $parser_obj,
-        out => $out_fh,
 
         #optional, # of pings to send before we send a close
         max_pings => 5,
@@ -19,7 +18,10 @@ Net::WebSocket::Endpoint::Server
             my ($frame) = @_;
 
             #...
-        }
+        },
+
+        #only for blocking I/O
+        out => $out_fh,
     );
 
     if ( _we_timed_out_waiting_for_read_readiness() ) {
@@ -67,9 +69,7 @@ Instantiate the class. Nothing is actually done here. Options are:
 
 =over
 
-=item * C<parser> (required) - An instance of L<Net::WebSocket::Parser>
-
-=item * C<out> (required) - The endpoint’s output filehandle
+=item * C<parser> (required) - An instance of L<Net::WebSocket::Parser>.
 
 =item * C<max_pings> (optional) - The maximum # of pings to send before
 we send a C<close> frame (which ends the session).
@@ -87,6 +87,14 @@ If you want to avoid buffering a large message, you can do this:
             fin => $_[0]->get_fin(),
         );
     },
+
+=item * C<out> (optional) - The endpoint’s output filehandle. This is only
+useful if your output is a blocking filehandle; otherwise, you should
+process the write queue manually via C<shift_write_queue()>.
+
+=item * C<before_send_frame> (optional) - A callback to be executed before
+the endpoint sends a ping, pong, or close frame. It receives as an argument
+the frame that will be sent.
 
 =back
 

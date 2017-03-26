@@ -15,21 +15,14 @@ use constant MAX_CHUNK_SIZE => 64000;
 
 use constant CRLF => "\x0d\x0a";
 
-sub handshake_as_server {
-    my ($inet) = @_;
+#Shortens the given text.
+sub get_server_handshake_from_text {
+    my $idx = index($_[0], CRLF . CRLF);
+    return undef if -1 == $idx;
 
-    my $buf = q<>;
+    my $hdrs_txt = substr( $_[0], 0, $idx + 2 * length(CRLF), q<> );
 
-    #Read the server handshake.
-    my $idx;
-    while ( IO::SigGuard::sysread($inet, $buf, MAX_CHUNK_SIZE, length $buf ) ) {
-        $idx = index($buf, CRLF . CRLF);
-        last if -1 != $idx;
-    }
-
-    my $hdrs_txt = substr( $buf, 0, $idx + 2 * length(CRLF), q<> );
-
-    die "Extra garbage! ($buf)" if length $buf;
+    die "Extra garbage! ($_[0])" if length $_[0];
 
     my $req = HTTP::Request->parse($hdrs_txt);
 
@@ -40,11 +33,22 @@ sub handshake_as_server {
 
     my $key = $req->header('Sec-WebSocket-Key');
 
-    my $handshake = Net::WebSocket::Handshake::Server->new(
+    return Net::WebSocket::Handshake::Server->new(
         key => $key,
     );
+}
 
-    print { $inet } $handshake->create_header_text() . CRLF;
+sub handshake_as_server {
+    my ($inet) = @_;
+
+    my $buf = q<>;
+    my $hsk;
+    while ( IO::SigGuard::sysread($inet, $buf, MAX_CHUNK_SIZE, length $buf ) ) {
+        $hsk = get_server_handshake_from_text($buf);
+        last if $hsk;
+    }
+
+    print { $inet } $hsk->create_header_text() . CRLF;
 
     return;
 }
