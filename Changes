@@ -14,11 +14,15 @@ Revision history for Perl module Net::WebSocket
 - Remove stray Call::Always usage in tests
 
 0.03
-- BREAKING: Endpoint now defers non-blocking writes to a queue.
-  Non-blocking implementations will need to account for writability
-  of the write filehandle and process the queue as needed.
+- “out” parameter to Endpoint constructor is made optional since
+  non-blocking I/O should empty out the write queue manually anyway.
 
 - Refactor ping handling behavior into its own module. It could be
   reusable potentially?
 
-- EINTR-trapping logic is now distributed separatedly as IO::SigGuard.
+- EINTR-trapping logic is now distributed separatedly as IO::SigGuard,
+  which is now a dependency.
+
+- Demos now favor IO::Events
+
+- Shell server demo now included.

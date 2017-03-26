@@ -6,8 +6,6 @@ use autodie;
 
 use Try::Tiny;
 
-use lib '/Users/Felipe/code/p5-IO-SigGuard/lib';
-
 use IO::Events ();
 
 use HTTP::Response;
@@ -205,7 +203,6 @@ sub run {
     for my $sig (ERROR_SIGS()) {
         $SIG{$sig} = sub {
             my ($the_sig) = @_;
-print STDERR "Got SIG$the_sig\n";
 
             my $code = ($the_sig eq 'INT') ? 'SUCCESS' : 'ENDPOINT_UNAVAILABLE';
 

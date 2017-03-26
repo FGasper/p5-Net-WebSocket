@@ -8,8 +8,6 @@ use Try::Tiny;
 
 use Socket;
 
-use lib '/Users/Felipe/code/p5-IO-SigGuard/lib';
-
 use IO::Socket::INET ();
 use IO::Events ();
 
