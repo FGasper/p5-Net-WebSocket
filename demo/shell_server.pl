@@ -1,5 +1,11 @@
 #!/usr/bin/env perl
 
+#----------------------------------------------------------------------
+# No guarantees are made as to the robustness of this server code;
+# this is meant purely as a demonstration of something cool to do with
+# WebSocket. :)
+#----------------------------------------------------------------------
+
 use strict;
 use warnings;
 use autodie;
@@ -39,6 +45,24 @@ my ($host, $port) = split m<:>, $host_port;
 
 my $loop = IO::Events::Loop->new();
 
+my %sessions;
+
+sub _kill_session {
+    my ($session) = @_;
+
+    if ( $sessions{$session} ) {
+        $sessions{$session}{'timeout'}->stop();
+
+        $sessions{$session}{'client'}->destroy();
+
+        if ($sessions{$session}{'shell'}) {
+            $sessions{$session}{'shell'}->destroy();
+        }
+
+        delete $sessions{$session};
+    }
+}
+
 my $server = IO::Events::Socket::TCP->new(
     owner => $loop,
     listen => 1,
@@ -46,6 +70,8 @@ my $server = IO::Events::Socket::TCP->new(
     port => $port,
     on_read => sub {
         my $shell = (getpwuid $>)[8] or die "No shell!";
+
+        my $session = rand;
 
         my $did_handshake;
         my $read_buffer = q<>;
@@ -83,14 +109,18 @@ my $server = IO::Events::Socket::TCP->new(
                     }
                 }
                 else {
-                    $client_hdl->destroy();
+                    _kill_session($session);
                 }
             },
         );
 
         $client_hdl = shift()->accept(
+            owner => $loop,
             read => 1,
             write => 1,
+            on_close => sub {
+                _kill_session($session);
+            },
             on_read => sub {
                 my ($client_hdl) = @_;
 
@@ -138,7 +168,7 @@ my $server = IO::Events::Socket::TCP->new(
                             exec { $shell } $shell, '--login' or die $!;
                         };
                         warn if $@;
-                        exit( $@ ? 1 : 0 );
+                        POSIX::exit(1);
                     };
 
                     $shell_hdl = IO::Events::Handle->new(
@@ -162,23 +192,32 @@ my $server = IO::Events::Socket::TCP->new(
                         pid => $cpid,
 
                         on_close => sub {
-                            $client_hdl->destroy();
+                            _kill_session($session);
                         },
                     );
+
+                    $sessions{$session}{'shell'} = $shell_hdl;
                 }
             }
         );
+
+        $sessions{$session} = {
+            client => $client_hdl,
+            timeout => $timeout,
+        };
     },
 );
 
-try {
-    $loop->yield() while 1;
-}
-catch {
-    if ( !try { $_->isa('Net::WebSocket::X::ReceivedClose') } ) {
-        local $@ = $_;
-        die;
+while (1) {
+    try {
+        $loop->yield() while 1;
     }
+    catch {
+        if ( !try { $_->isa('Net::WebSocket::X::ReceivedClose') } ) {
+            local $@ = $_;
+            die;
+        }
 
-    $loop->flush();
-};
+        $loop->flush();
+    };
+}
