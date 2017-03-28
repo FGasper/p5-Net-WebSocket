@@ -20,14 +20,28 @@ Net::WebSocket::Handshake::Client
         key => '..',
     );
 
-    #Includes only one trailing CRLF, so you can add additional headers
-    my $txt = $hsk->create_header_text();
+    #Note the need to conclude the header text manually.
+    #This is by design, so you can add additional headers.
+    my $hdr = $hsk->create_header_text() . "\x0d\x0a";
 
     my $b64 = $hsk->get_key();
 
     #Validates the value of the “Sec-WebSocket-Accept” header;
     #throws Net::WebSocket::X::BadAccept if not.
     $hsk->validate_accept_or_die($accent_value);
+
+=head1 DESCRIPTION
+
+This class implements WebSocket handshake logic for a client.
+
+Because Net::WebSocket tries to be agnostic about how you parse your HTTP
+headers, this class doesn’t do a whole lot for you: it’ll create a base64
+key for you and create “starter” headers for you. It also can validate
+the C<Sec-WebSocket-Accept> header value from the server.
+
+B<NOTE:> C<create_header_text()> does NOT provide the extra trailing
+CRLF to conclude the HTTP headers. This allows you to add additional
+headers beyond what this class gives you.
 
 =cut
 
