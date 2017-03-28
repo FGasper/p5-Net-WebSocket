@@ -65,18 +65,24 @@ WebSocket protocol itself. There are some examples
 of how you might write complete applications (client or server)
 in the distribution’s C<demo/> directory.
 
-Net::WebSocket is not a “quick-and-cheap” WebSocket solution; rather,
-it attempts to support the protocol—and only that protocol—as
-completely, usefully, and flexibly as possible.
+Net::WebSocket is not a “quick” WebSocket solution; for that,
+check out L<Mojolicious>. Net::WebSocket’s purpose is to support anything
+that the WebSocket protocol itself can do, as lightly as possible and without
+prejudice as to how you want to do it: extensions, blocking/non-blocking I/O,
+arbitrary HTTP headers, etc.
 
 =head1 OVERVIEW
 
 WebSocket is almost “two protocols for the price of one”: the
 HTTP-derived handshake logic, then the framing logic for the actual data
-exchange. The handshake portion is complex enough, and has enough support
-from CPAN’s HTTP modules, that this distribution only provides a few basic
+exchange. The handshake portion is just an HTTP headers exchange, which
+CPAN’s HTTP modules already support very well, so this distribution only
+provides a few basic
 tools—the WebSocket-specific stuff, mostly—for doing the handshake.
-It’s enough to get you where you need to go, but not much more.
+It’s enough to get you where you need to go, but not much more. You’ll
+need to write out some details of the handshake yourself.
+
+Net::WebSocket handles the framing logic extensively.
 
 Here are the main modules:
 
@@ -174,11 +180,17 @@ can do in your application.
 
 =head1 SEE ALSO
 
+L<Mojolicious> is probably CPAN’s easiest WebSocket implementation to get
+a server up and running. If you’re building a project from scratch, you
+may find this to be a better fit for you than Net::WebSocket.
+
 L<Protocol::WebSocket> is an older module that supports
-pre-standard versions of the WebSocket protocol.
+pre-standard versions of the WebSocket protocol. It’s similar to this one
+in that it gives you just the protocol itself, but it doesn’t give you
+things like automatic ping/pong/close, classes for each message type, etc.
 
 L<Net::WebSocket::Server> implements only server behaviors and
-gives you more automation.
+gives you more automation than P::WS.
 
 L<Net::WebSocket::EV> uses XS to call a C library.
 
