@@ -10,10 +10,6 @@ BEGIN {
 use Test::More;
 use Test::Deep;
 
-use FindBin;
-use lib "$FindBin::Bin/lib";
-use StringIO;
-
 use File::Slurp;
 use File::Temp;
 
