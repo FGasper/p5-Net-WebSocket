@@ -52,8 +52,6 @@ use parent qw( Net::WebSocket::Handshake::Base );
 
 use URI::Split ();
 
-use Module::Load ();
-
 use Net::WebSocket::Constants ();
 use Net::WebSocket::X ();
 
@@ -131,9 +129,10 @@ sub get_key {
 
 sub _create_key {
     Module::Load::load('MIME::Base64') if !MIME::Base64->can('encode');
-    Module::Load::load('Net::WebSocket::RNG') if !Net::WebSocket::RNG->can('get');
 
-    my $b64 = MIME::Base64::encode_base64( Net::WebSocket::RNG::get()->bytes(16) );
+    my $sixteen_bytes = pack 'S8', map { rand 65536 } 1 .. 8;
+
+    my $b64 = MIME::Base64::encode_base64($sixteen_bytes);
     chomp $b64;
 
     return $b64;

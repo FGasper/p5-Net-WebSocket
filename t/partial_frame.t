@@ -12,6 +12,8 @@ use Test::Deep;
 
 use IO::Select ();
 
+use IO::Framed::Read ();
+
 use Net::WebSocket::Parser ();
 
 my @tests = (
@@ -48,7 +50,9 @@ for my $t (@tests) {
 
     my $frame;
 
-    my $parser = Net::WebSocket::Parser->new( $rdr );
+    my $io = IO::Framed::Read->new($rdr);
+
+    my $parser = Net::WebSocket::Parser->new( $io );
 
     my $ios = IO::Select->new($rdr);
 

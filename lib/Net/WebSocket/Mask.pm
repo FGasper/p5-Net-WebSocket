@@ -8,12 +8,7 @@ use Module::Load ();
 my $_loaded_rng;
 
 sub create {
-    if (!$_loaded_rng) {
-        Module::Load::load('Net::WebSocket::RNG');
-        $_loaded_rng = 1;
-    }
-
-    return Net::WebSocket::RNG::get()->bytes(4);
+    return pack 'L', ( ( (rand 65536) << 16 ) | (rand 65536) );
 }
 
 sub apply {

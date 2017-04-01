@@ -15,8 +15,9 @@ See L<Net::WebSocket::Endpoint::Server>.
 use strict;
 use warnings;
 
+use Try::Tiny;
+
 use Call::Context ();
-use IO::SigGuard ();
 
 use Net::WebSocket::Frame::close ();
 use Net::WebSocket::Frame::ping ();
@@ -30,8 +31,13 @@ use constant DEFAULT_MAX_PINGS => 3;
 sub new {
     my ($class, %opts) = @_;
 
-    my @missing = grep { !length $opts{$_} } qw( parser );
-    #die "Missing: [@missing]" if @missing;
+    my @missing = grep { !length $opts{$_} } qw( out parser );
+
+    die "Missing: [@missing]" if @missing;
+
+    if ( !try { $opts{'out'}->can('write') } ) {
+        die "“out” ($opts{'out'}) needs a write() method!";
+    }
 
     my $self = {
         _fragments => [],
@@ -40,8 +46,6 @@ sub new {
 
         _ping_store => Net::WebSocket::PingStore->new(),
 
-        _frames_queue => [],
-
         (map { defined($opts{$_}) ? ( "_$_" => $opts{$_} ) : () } qw(
             parser
             max_pings
@@ -49,7 +53,6 @@ sub new {
             on_data_frame
 
             out
-            before_send_control_frame
         )),
     };
 
@@ -103,15 +106,13 @@ sub check_heartbeat {
 
     my $ping_counter = $self->{'_ping_store'}->get_count();
 
-    my $write_func = $self->_get_write_func();
-
     if ($ping_counter == $self->{'_max_pings'}) {
         my $close = Net::WebSocket::Frame::close->new(
             $self->FRAME_MASK_ARGS(),
             code => 'POLICY_VIOLATION',
         );
 
-        $self->$write_func($close);
+        $self->_write_frame($close);
 
         $self->{'_closed'} = 1;
     }
@@ -123,7 +124,7 @@ sub check_heartbeat {
         $self->FRAME_MASK_ARGS(),
     );
 
-    $self->$write_func($ping);
+    $self->_write_frame($ping);
 
     return;
 }
@@ -137,9 +138,7 @@ sub shutdown {
         reason => $opts{'reason'},
     );
 
-    my $write_func = $self->_get_write_func();
-
-    $self->$write_func($close);
+    $self->_write_frame($close);
 
     $self->{'_closed'} = 1;
 
@@ -151,45 +150,12 @@ sub is_closed {
     return $self->{'_closed'} ? 1 : 0;
 }
 
-sub get_write_queue_size {
-    my ($self) = @_;
-
-    return ($self->{'_partially_written_frame'} ? 1 : 0) + @{ $self->{'_frames_queue'} };
-}
-
-sub shift_write_queue {
-    my ($self) = @_;
-
-    return shift @{ $self->{'_frames_queue'} };
-}
-
-sub process_write_queue {
-    my ($self) = @_;
-
-    $self->_verify_not_closed();
-
-    if ($self->{'_partially_written_frame'}) {
-        if ( $self->_write_bytes_no_prehook( $self->{'_partially_written_frame'} ) ) {
-            undef $self->{'_partially_written_frame'};
-        }
-    }
-    else {
-        my $qi = shift @{ $self->{'_frames_queue'} } or die 'process_write_queue() on empty!';
-
-        $self->_write_now( $qi );
-    }
-
-    return;
-}
-
 #----------------------------------------------------------------------
 
 sub on_ping {
     my ($self, $frame) = @_;
 
-    my $write_func = $self->_get_write_func();
-
-    $self->$write_func(
+    $self->_write_frame(
         Net::WebSocket::Frame::pong->new(
             payload_sr => \$frame->get_payload(),
             $self->FRAME_MASK_ARGS(),
@@ -209,20 +175,6 @@ sub on_pong {
 
 #----------------------------------------------------------------------
 
-sub _get_write_func {
-    my ($self) = @_;
-
-    return $self->{'_out'} ? '_write_now' : '_enqueue_write';
-}
-
-sub _enqueue_write {
-    my $self = shift;
-
-    push @{ $self->{'_frames_queue'} }, $_[0];
-
-    return;
-}
-
 sub _got_continuation_during_non_fragment {
     my ($self, $frame) = @_;
 
@@ -237,9 +189,7 @@ sub _got_continuation_during_non_fragment {
         $self->FRAME_MASK_ARGS(),
     );
 
-    my $write_func = $self->_get_write_func();
-
-    $self->$write_func($err_frame);
+    $self->_write_frame($err_frame);
 
     die Net::WebSocket::X->create( 'ReceivedBadControlFrame', $msg );
 }
@@ -258,9 +208,7 @@ sub _got_non_continuation_during_fragment {
         $self->FRAME_MASK_ARGS(),
     );
 
-    my $write_func = $self->_get_write_func();
-
-    $self->$write_func($err_frame);
+    $self->_write_frame($err_frame);
 
     die Net::WebSocket::X->create( 'ReceivedBadControlFrame', $msg );
 }
@@ -292,9 +240,7 @@ sub _handle_control_frame {
             $self->FRAME_MASK_ARGS(),
         );
 
-        my $write_func = $self->_get_write_func();
-
-        $self->$write_func( $resp_frame );
+        $self->_write_frame( $resp_frame );
 
         die Net::WebSocket::X->create('ReceivedClose', $frame);
     }
@@ -312,33 +258,10 @@ sub _handle_control_frame {
     return;
 }
 
-sub _write_now {
+sub _write_frame {
     my ($self, $frame, $todo_cr) = @_;
 
-    if ($self->can('_before_send_frame')) {
-        $self->_before_send_frame($frame);
-    }
-
-    return $self->_write_bytes_no_prehook($frame->to_bytes(), $todo_cr);
-}
-
-sub _write_bytes_no_prehook {
-    my $self = $_[0];
-
-    local $!;
-
-    my $wrote = IO::SigGuard::syswrite( $self->{'_out'}, $_[1] );
-
-    #Full success:
-    if ($wrote == length $_[1]) {
-        $_[2]->() if $_[2];
-        return 1;
-    }
-
-    #Partial write; we need to come back to this one.
-    $self->{'_partially_written_frame'} = substr( $_[1], $wrote );
-
-    return;
+    return $self->{'_out'}->write($frame->to_bytes(), $todo_cr);
 }
 
 1;

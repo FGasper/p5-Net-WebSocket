@@ -14,7 +14,6 @@ use Try::Tiny;
 
 use Socket;
 
-use IO::Socket::INET ();
 use IO::Events ();
 
 use FindBin;

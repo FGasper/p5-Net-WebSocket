@@ -32,7 +32,7 @@ sub AUTOLOAD {
         }
     }
 
-    die( ref($self) . " has no method “$method”!" );
+    die( "$self has no method “$method”!" );
 }
 
 #----------------------------------------------------------------------

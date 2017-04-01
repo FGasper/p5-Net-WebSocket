@@ -32,9 +32,7 @@ WriteMakefile1(
         'MIME::Base64' => 0,
         'Digest::SHA' => 0,
         'URI::Split' => 0,
-        'Bytes::Random::Secure::Tiny' => 0,
         'Call::Context' => 0,
-        'IO::SigGuard' => 0,
     },
     META_MERGE => {
         'meta-spec' => { version => 2 },
@@ -51,6 +49,7 @@ WriteMakefile1(
         'Test::Simple'    => 0,
         'File::Temp' => 0,
         'File::Slurp' => 0,
+        'IO::Framed' => 0,
     },
 );
 

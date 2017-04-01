@@ -1,6 +1,6 @@
 package Net::WebSocket;
 
-our $VERSION = '0.03_2';
+our $VERSION = '0.03_3';
 
 =encoding utf-8
 
@@ -28,15 +28,22 @@ Net::WebSocket - WebSocket in Perl
     );
 
     my $ept = Net::WebSocket::Endpoint::Client->new(
-        out => $inet,
         parser => $parser,
+
+        #Include this *only* for blocking I/O. Ordinarily, control frame
+        #responses (e.g., pong, close) are queued up to be sent
+        #whenever whichever filehandle is ready to accept data.
+        #That’s for non-blocking I/O; if you’re using blocking I/O, then
+        #you can include this parameter to have those responses sent
+        #immediately.
+        out => $inet,
     );
 
     #Determine that $inet can be read from …
 
     my $msg = $ept->get_next_message();
 
-    #… or, if we timeout while waiting for $inet be ready for reading:
+    #… or, if we timeout while waiting for $inet to be ready for reading:
 
     $ept->check_heartbeat();
     exit if $ept->is_closed();
@@ -69,20 +76,12 @@ Net::WebSocket is not a “quick” WebSocket solution; for that,
 check out L<Mojolicious>. Net::WebSocket’s purpose is to support anything
 that the WebSocket protocol itself can do, as lightly as possible and without
 prejudice as to how you want to do it: extensions, blocking/non-blocking I/O,
-arbitrary HTTP headers, etc.
+arbitrary HTTP headers, etc. Net::WebSocket will likely require more of an
+investment up-front, but its flexibility should allow it to do anything that
+can be done with WebSocket, and much more cleanly than a more “monolithic”
+solution would likely allow.
 
 =head1 OVERVIEW
-
-WebSocket is almost “two protocols for the price of one”: the
-HTTP-derived handshake logic, then the framing logic for the actual data
-exchange. The handshake portion is just an HTTP headers exchange, which
-CPAN’s HTTP modules already support very well, so this distribution only
-provides a few basic
-tools—the WebSocket-specific stuff, mostly—for doing the handshake.
-It’s enough to get you where you need to go, but not much more. You’ll
-need to write out some details of the handshake yourself.
-
-Net::WebSocket handles the framing logic extensively.
 
 Here are the main modules:
 
@@ -122,14 +121,28 @@ for sample usage.
 
 =head1 IMPLEMENTATION NOTES
 
+=head2 Handshakes
+
+WebSocket uses regular HTTP headers for its handshakes. Because there are
+many different solutions around for parsing HTTP headers, Net::WebSocket
+tries to be “agnostic” about how that’s done. The liability of this is
+that you, the library user, will need to implement some of the handshake
+logic yourself. If you’re building from the ground up that’s not a lot of
+fun, but if you’ve already got a solution in place for parsing headers then
+Net::WebSocket can fit into that quite easily.
+
 =head2 Masking
 
 As per L<the specification|https://tools.ietf.org/html/rfc6455#section-5.1>,
 client serializers “MUST” mask the data randomly, whereas server serializers
-“MUST NOT” do this. Net::WebSocket does this for you automatically
-(courtesy of L<Bytes::Random::Secure::Tiny>), but you need to distinguish
+“MUST NOT” do this. Net::WebSocket does this for you automatically,
+but you need to distinguish
 between client serializers—which mask their payloads—and server serializers,
 which don’t mask.
+
+This module used to do this with L<Bytes::Random::Secure::Tiny>; however,
+that seems like overkill given that the masking is only there to accommodate
+peculiarities of certain proxies.
 
 =head2 Text vs. Binary
 

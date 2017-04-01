@@ -33,7 +33,7 @@ Net::WebSocket::Endpoint::Server
         #it’s meaningless in blocking I/O.
         #See below for an alternative pattern for use with POE, etc.
         if ( $ept->get_write_queue_size() ) {
-            $ept->process_write_queue();
+            $ept->flush_write_queue();
         }
 
         #This should only be called when reading won’t produce an error.
@@ -41,11 +41,11 @@ Net::WebSocket::Endpoint::Server
         #of this. (Blocking I/O can just call it and wait!)
         $ept->get_next_message();
 
-        #INSTEAD OF process_write_queue(), you might want to send the write
+        #INSTEAD OF flush_write_queue(), you might want to send the write
         #queue off to a multiplexing framework like POE, for which this
         #would be useful:
         while ( my $frame = $ept->shift_write_queue() ) {
-            #… do something with $frame->to_bytes()
+            #… do something with $frame->to_bytes() -- probably send it
         }
 
         #Check for this at the end of each cycle.
@@ -125,9 +125,9 @@ B<NOTE:> If the “out” file handle given to the constructor is in
 non-blocking mode, then any response frames will be queued rather than
 sent immediately. That’s where the next method comes in …
 
-=head2 I<OBJ>->process_write_queue()
+=head2 I<OBJ>->flush_write_queue()
 
-This is only useful in non-blocking I/O contexts—and at that, probably
+Only useful in non-blocking I/O contexts—and at that, probably
 only useful when you’re not using an event loop, since that loop will
 likely do its own write buffering.
 

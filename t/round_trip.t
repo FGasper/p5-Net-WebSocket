@@ -4,9 +4,15 @@ use strict;
 use warnings;
 use autodie;
 
+use Try::Tiny;
+
 use Test::More;
 
 plan tests => 1;
+
+use File::Temp;
+
+use IO::Framed::Read ();
 
 use Net::WebSocket::Parser ();
 use Net::WebSocket::Streamer::Client ();
@@ -15,36 +21,39 @@ my $start = 'We have come to dedicate a portion of that field as a final resting
 
 my $start_copy = $start;
 
-my ($rdr, $wtr);
-my $content; #for Windows
-if ($^O eq 'MSWin32') { #hangs on Windows if pipe is used
-    open $wtr,'>',\$content;
-} else {
-    pipe( $rdr, $wtr );
-}
+my ($fh, $file) = File::Temp::tempfile( CLEANUP => 1 );
+
+$fh->autoflush(1);
 
 while (my $chunk = substr($start_copy, 0, 25, q<>)) {
     my $streamer = Net::WebSocket::Streamer::Client->new('text');
     while( length($chunk) > 10 ) {
         my $subchunk = substr($chunk, 0, 10, q<>);
-        print {$wtr} $streamer->create_chunk($subchunk)->to_bytes();
+        print {$fh} $streamer->create_chunk($subchunk)->to_bytes();
     }
 
-    print {$wtr} $streamer->create_final($chunk)->to_bytes();
+    print {$fh} $streamer->create_final($chunk)->to_bytes();
 }
 
-close $wtr;
-if ($^O eq 'MSWin32') {
-    open $rdr,'<',\$content;
-}
+close $fh;
 
-my $parse = Net::WebSocket::Parser->new( $rdr );
+open my $rdr, '<', $file;
+
+my $parse = Net::WebSocket::Parser->new( IO::Framed::Read->new($rdr) );
 
 my $received = q<>;
 
-while ( my $msg = $parse->get_next_frame() ) {
-    $received .= $msg->get_payload();
+try {
+    while ( my $msg = $parse->get_next_frame() ) {
+        $received .= $msg->get_payload();
+    }
 }
+catch {
+    if (!try { $_->isa('IO::Framed::X::EmptyRead') }) {
+        local $@ = $_;
+        die;
+    }
+};
 
 is(
     $received,

@@ -2,13 +2,22 @@
 
 use strict;
 use warnings;
-use autodie;
+
+BEGIN {
+    eval 'use autodie';
+}
 
 use Test::More;
 use Test::Deep;
 
+use FindBin;
+use lib "$FindBin::Bin/lib";
+use StringIO;
+
 use File::Slurp;
 use File::Temp;
+
+use IO::Framed::ReadWrite::Blocking ();
 
 plan tests => 6;
 
@@ -57,7 +66,8 @@ my @tests = (
         sub {
             open my $read_out_fh, '<', $out_path;
 
-            my $out_parser = Net::WebSocket::Parser->new( $read_out_fh );
+            my $io = IO::Framed::ReadWrite::Blocking->new($read_out_fh);
+            my $out_parser = Net::WebSocket::Parser->new( $io );
 
             cmp_deeply(
                 $out_parser->get_next_frame(),
@@ -105,7 +115,8 @@ my @tests = (
 
             open my $read_out_fh, '<', $out_path;
 
-            my $out_parser = Net::WebSocket::Parser->new( $read_out_fh );
+            my $io = IO::Framed::ReadWrite::Blocking->new($read_out_fh);
+            my $out_parser = Net::WebSocket::Parser->new( $io );
 
             my $resp = $out_parser->get_next_frame();
 
@@ -127,17 +138,23 @@ my @tests = (
     ],
 );
 
-$full_buffer = join( q<>, map { $_->[0] } @tests );
-open my $full_read_fh, '<', \$full_buffer;
-my $parser = Net::WebSocket::Parser->new( $full_read_fh );
+(my $in_fh, my $in_path) = File::Temp::tempfile( CLEANUP => 1);
+syswrite( $in_fh, $_->[0] ) for @tests;
+close $in_fh;
+
+open my $full_read_fh, '<', $in_path;
 
 open my $out_fh, '>>', $out_path;
 
 $out_fh->blocking(1);
 
+my $io = IO::Framed::ReadWrite::Blocking->new( $full_read_fh, $out_fh );
+
+my $parser = Net::WebSocket::Parser->new( $io );
+
 my $ept = Net::WebSocket::Endpoint::Server->new(
     parser => $parser,
-    out => $out_fh,
+    out => $io,
 );
 
 for my $t (@tests) {
