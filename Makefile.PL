@@ -5,6 +5,7 @@ use ExtUtils::MakeMaker;
 # the contents of the Makefile that is written.
 WriteMakefile1(
     META_MERGE => {
+        'meta-spec' => { version => 2 },
         resources => {
             repository => {
                 type => 'git',
@@ -34,19 +35,11 @@ WriteMakefile1(
         'URI::Split' => 0,
         'Call::Context' => 0,
     },
-    META_MERGE => {
-        'meta-spec' => { version => 2 },
-        resources   => {
-            repository => {
-                type => 'git',
-                url  => 'https://github.com/FGasper/p5-Net-WebSocket.git',
-                web  => 'https://github.com/FGasper/p5-Net-WebSocket',
-            },
-        },
-    },
+
     TEST_REQUIRES => {
         'Test::More'      => 0,
         'Test::Simple'    => 0,
+        'Test::Deep' => 0,
         'File::Temp' => 0,
         'File::Slurp' => 0,
         'IO::Framed' => 0,

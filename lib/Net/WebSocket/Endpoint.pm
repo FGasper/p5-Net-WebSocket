@@ -15,8 +15,6 @@ See L<Net::WebSocket::Endpoint::Server>.
 use strict;
 use warnings;
 
-use Try::Tiny;
-
 use Call::Context ();
 
 use Net::WebSocket::Frame::close ();
@@ -35,7 +33,7 @@ sub new {
 
     die "Missing: [@missing]" if @missing;
 
-    if ( !try { $opts{'out'}->can('write') } ) {
+    if ( !(ref $opts{'out'})->can('write') ) {
         die "“out” ($opts{'out'}) needs a write() method!";
     }
 

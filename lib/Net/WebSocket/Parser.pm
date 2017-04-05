@@ -82,7 +82,7 @@ use constant {
 sub new {
     my ($class, $reader) = @_;
 
-    if (!try { $reader->can('read') }) {
+    if (!(ref $reader)->can('read')) {
         die "“$reader” needs a read() method!";
     }
 
