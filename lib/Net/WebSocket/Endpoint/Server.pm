@@ -11,17 +11,17 @@ Net::WebSocket::Endpoint::Server
     my $ept = Net::WebSocket::Endpoint::Server->new(
         parser => $parser_obj,
 
+        out => $out_fh,
+
         #optional, # of pings to send before we send a close
         max_pings => 5,
 
+        #optional
         on_data_frame => sub {
-            my ($frame) = @_;
+            my ($frame_obj) = @_;
 
             #...
         },
-
-        #only for blocking I/O
-        out => $out_fh,
     );
 
     if ( _we_timed_out_waiting_for_read_readiness() ) {

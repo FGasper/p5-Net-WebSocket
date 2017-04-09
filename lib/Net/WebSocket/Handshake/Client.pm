@@ -16,6 +16,9 @@ Net::WebSocket::Handshake::Client
         #optional
         subprotocols => [ 'echo', 'haha' ],
 
+        #optional, to imitate a web client
+        origin => ..,
+
         #optional, base 64 .. auto-created if not given
         key => '..',
     );
