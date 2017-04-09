@@ -63,8 +63,6 @@ decompress so that that detail is abstracted away.
 use strict;
 use warnings;
 
-use Try::Tiny;
-
 use Module::Load ();
 
 use Net::WebSocket::Constants ();

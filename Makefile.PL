@@ -43,6 +43,7 @@ WriteMakefile1(
         'File::Temp' => 0,
         'File::Slurp' => 0,
         'IO::Framed' => 0,
+        'IO::Select' => 0,
     },
 );
 
