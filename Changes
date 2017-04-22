@@ -10,3 +10,6 @@ Revision history for Perl module Net::WebSocket
 
 0.021 Thu Mar 23 2017
 - Remove stray Call::Always usage in tests
+
+0.022 Sat Apr 22 2017
+- Remove stray Try::Tiny dependency

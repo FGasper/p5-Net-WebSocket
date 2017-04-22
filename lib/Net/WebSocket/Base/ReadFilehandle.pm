@@ -3,8 +3,6 @@ package Net::WebSocket::Base::ReadFilehandle;
 use strict;
 use warnings;
 
-use Try::Tiny;
-
 use Net::WebSocket::X ();
 
 sub new {
@@ -16,9 +14,16 @@ sub new {
         $start_buf = q<>;
     }
 
+    #There’s some Perl version that doesn’t handle “local $@” well;
+    #I can’t remember which it is right now.
+    my $err = $@;
+
     #Determine if this is an OS-level filehandle;
     #if it is, then we read with sysread(); otherwise we use read().
-    my $fileno = try { fileno $fh };
+    my $fileno = eval { fileno $fh };
+
+    $@ = $err;
+
     undef $fileno if defined($fileno) && $fileno == -1;
 
     return bless {
