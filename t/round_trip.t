@@ -4,8 +4,6 @@ use strict;
 use warnings;
 use autodie;
 
-use Try::Tiny;
-
 use Test::More;
 
 plan tests => 1;
@@ -43,13 +41,16 @@ my $parse = Net::WebSocket::Parser->new( IO::Framed::Read->new($rdr) );
 
 my $received = q<>;
 
-try {
+eval {
     while ( my $msg = $parse->get_next_frame() ) {
         $received .= $msg->get_payload();
     }
+
+    1;
 }
-catch {
-    if (!try { $_->isa('IO::Framed::X::EmptyRead') }) {
+or do {
+    my $err = $@;
+    if (!$@->isa('IO::Framed::X::EmptyRead')) {
         local $@ = $_;
         die;
     }
