@@ -1,6 +1,6 @@
 package Net::WebSocket;
 
-our $VERSION = '0.03_7';
+our $VERSION = '0.03';
 
 =encoding utf-8
 
@@ -48,14 +48,11 @@ Net::WebSocket - WebSocket in Perl
     $ept->check_heartbeat();
     exit if $ept->is_closed();
 
-=head1 ALPHA QUALITY
+=head1 BETA QUALITY
 
-This is a preliminary release. It is not meant for
-production work, but please do play with it and see how it works for you.
-Bug reports, especially with reproducible test cases, would be very welcome!
-
-Breaking changes are still a possibility here, though they should be pretty
-minor.
+This is a beta release. It should be safe for production, but there could
+still be small changes to the API. Please check the changelog before
+upgrading.
 
 =head1 DESCRIPTION
 
@@ -140,21 +137,18 @@ but you need to distinguish
 between client serializers—which mask their payloads—and server serializers,
 which don’t mask.
 
-This module used to do this with L<Bytes::Random::Secure::Tiny>; however,
+This module used to do this with L<Bytes::Random::Secure::Tiny>, but
 that seems like overkill given that the masking is only there to accommodate
-peculiarities of certain proxies.
+peculiarities of certain proxies. We now just use Perl’s C<rand()>
+built-in.
+
+(You should probably use TLS if cryptographically secure masking is something
+you care about?)
 
 =head2 Text vs. Binary
 
 Recall that in some languages—like JavaScript!—the difference between
 “text” and “binary” is much more significant than for us in Perl.
-
-=head2 Parsed Frame Classes
-
-Net::WebSocket tries to be as light as possible and so, when it parses out
-a frame, at first only a base L<Net::WebSocket::Frame> implementation is
-created. An AUTOLOAD method will “upgrade” any such frame that needs the
-specific methods of its class.
 
 =head1 EXTENSION SUPPORT
 
@@ -164,7 +158,8 @@ protocol, all of which Net::WebSocket supports:
 =over
 
 =item * The three reserved bits in each frame’s header.
-(See L<Net::WebSocket::Frame>.)
+(See L<Net::WebSocket::Frame>.) This is used, e.g., in the
+L<https://tools.ietf.org/html/rfc7692|permessage-deflate extension>.
 
 =item * Additional opcodes: 3-7 and 11-15. You’ll need to subclass
 L<Net::WebSocket::Frame> for this, and you will likely want to subclass
@@ -174,7 +169,8 @@ also subclass L<Net::WebSocket::Streamer>. See each of those modules for
 more information on doing this.
 
 B<THIS IS NOT WELL TESTED.> Proceed with caution, and please file bug
-reports as needed.
+reports as needed. (I personally don’t know of any applications that
+actually use this.)
 
 =item * Apportion part of the payload data for the extension. This you
 can do in your application.
