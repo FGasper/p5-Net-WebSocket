@@ -50,5 +50,3 @@ Revision history for Perl module Net::WebSocket
 
 - Shell server demo now included. Hook it up to a nice JavaScript terminal
   emulator like xterm.js, and impress all your friends. :)
-
-- Fixed dependencies - removed Try::Tiny, added Test::Deep as test prereq
