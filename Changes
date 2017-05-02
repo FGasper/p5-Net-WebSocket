@@ -32,7 +32,8 @@ Revision history for Perl module Net::WebSocket
 - BREAKING: I’ve removed the before_send_control_frame() handler.
 
 - Net::WebSocket::Parser now instantiates the “target” frame class object,
-  not the base Net::WebSocket::Frame class.
+  not the base Net::WebSocket::Frame class. So there’s no more of the
+  AUTOLOAD shenanigans of before.
 
 - Removed the Bytes::Random::Secure::Tiny dependency. It doesn’t seem we
   really need cryptographically strong random numbers for masking or
