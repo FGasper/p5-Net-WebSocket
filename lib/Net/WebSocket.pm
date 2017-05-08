@@ -22,21 +22,15 @@ Net::WebSocket - WebSocket in Perl
     my $accept = $req->header('Sec-WebSocket-Accept');
     $handshake->validate_accept_or_die($accept);
 
-    my $parser = Net::WebSocket::ParseFilehandle->new(
-        $inet,
+    #See below about IO::Framed
+    my $parser = Net::WebSocket::Parser->new(
+        IO::Framed::Read->new($inet),
         $leftover_from_header_read,     #can be nonempty on the client
     );
 
     my $ept = Net::WebSocket::Endpoint::Client->new(
         parser => $parser,
-
-        #Include this *only* for blocking I/O. Ordinarily, control frame
-        #responses (e.g., pong, close) are queued up to be sent
-        #whenever whichever filehandle is ready to accept data.
-        #That’s for non-blocking I/O; if you’re using blocking I/O, then
-        #you can include this parameter to have those responses sent
-        #immediately.
-        out => $inet,
+        out => IO::Framed::Write->new($inet),
     );
 
     #Determine that $inet can be read from …
@@ -149,6 +143,13 @@ you care about?)
 
 Recall that in some languages—like JavaScript!—the difference between
 “text” and “binary” is much more significant than for us in Perl.
+
+=head2 Use of L<IO::Framed>
+
+L<IO::Framed> provides a straightforward interface for chunking up data from
+byte streams into frames. You don’t have to use it (which is why it’s not
+listed as a requirement), but you’ll need to provide an equivalent interface
+if you don’t.
 
 =head1 EXTENSION SUPPORT
 
