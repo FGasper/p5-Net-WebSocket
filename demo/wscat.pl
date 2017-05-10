@@ -6,8 +6,9 @@ use autodie;
 
 use Try::Tiny;
 
+use IO::Events ();
+
 use HTTP::Response;
-use IO::Select ();
 use IO::Socket::INET ();
 use Socket ();
 use URI::Split ();
@@ -25,12 +26,15 @@ use constant MAX_CHUNK_SIZE => 64000;
 
 use constant CRLF => "\x0d\x0a";
 
+#No PIPE
 use constant ERROR_SIGS => qw( INT HUP QUIT ABRT USR1 USR2 SEGV ALRM TERM );
 
 run( @ARGV ) if !caller;
 
 sub run {
     my ($uri) = @_;
+
+    -t \*STDIN or die "STDIN must be a TTY for this demo.\n";
 
     my ($uri_scheme, $uri_authority) = URI::Split::uri_split($uri);
 
@@ -70,70 +74,130 @@ sub run {
         die "Unknown scheme ($uri_scheme) in URI: “$uri”";
     }
 
-    my $buf_sr = _handshake_as_client( $inet, $uri );
+    my $loop = IO::Events::Loop->new();
 
-    _mux_after_handshake( \*STDIN, \*STDOUT, $inet, $$buf_sr );
+    my ($handle, $ept);
 
-    exit 0;
-}
+    my $timeout = IO::Events::Timer->new(
+        owner => $loop,
+        timeout => 5,
+        repetitive => 1,
+        on_tick => sub {
+            $ept->check_heartbeat();
 
-sub _handshake_as_client {
-    my ($inet, $uri) = @_;
-
-    my $handshake = Net::WebSocket::Handshake::Client->new(
-        uri => $uri,
+            #Handle any control frames we might need to write out,
+            #esp. pings.
+            while ( my $frame = $ept->shift_write_queue() ) {
+                $handle->write($frame->to_bytes());
+            }
+        },
     );
 
-    my $hdr = $handshake->create_header_text();
+    my @to_write;
 
-    #Write out the client handshake.
-    syswrite( $inet, $hdr . CRLF );
+    my $sent_handshake;
+    my $got_handshake;
 
-    my $handshake_ok;
+    my $read_buffer = q<>;
 
-    my $buf = q<>;
+    open my $read_fh, '<', \$read_buffer;
 
-    #Read the server handshake.
-    my $idx;
-    while ( sysread $inet, $buf, MAX_CHUNK_SIZE, length $buf ) {
-        $idx = index($buf, CRLF . CRLF);
-        last if -1 != $idx;
-    }
+    my $handshake;
 
-    my $hdrs_txt = substr( $buf, 0, $idx + 2 * length(CRLF), q<> );
+    $handle = IO::Events::Handle->new(
+        owner => $loop,
+        handle => $inet,
+        read => 1,
+        write => 1,
 
-    my $req = HTTP::Response->parse($hdrs_txt);
+        on_create => sub {
+            my ($self) = @_;
 
-    my $code = $req->code();
-    die "Must be 101, not “$code”" if $code != 101;
+            $timeout->start();
 
-    my $upg = $req->header('upgrade');
-    $upg =~ tr<A-Z><a-z>;
-    die "“Upgrade” must be “websocket”, not “$upg”!" if $upg ne 'websocket';
+            $handshake = Net::WebSocket::Handshake::Client->new(
+                uri => $uri,
+            );
 
-    my $conn = $req->header('connection');
-    $conn =~ tr<A-Z><a-z>;
-    die "“Upgrade” must be “upgrade”, not “$conn”!" if $conn ne 'upgrade';
+            my $hdr = $handshake->create_header_text();
 
-    my $accept = $req->header('Sec-WebSocket-Accept');
-    $handshake->validate_accept_or_die($accept);
+            $self->write( $hdr . CRLF );
 
-    return \$buf;
-}
+            $sent_handshake = 1;
+        },
 
-my $sent_ping;
+        on_read => sub {
+            my ($self) = @_;
 
-sub _mux_after_handshake {
-    my ($from_caller, $to_caller, $inet, $buf) = @_;
+            $read_buffer .= $self->read();
 
-    my $parser = Net::WebSocket::Parser->new(
-        $inet,
-        $buf,
+            if (!$got_handshake) {
+                my $idx = index($read_buffer, CRLF . CRLF);
+                return if -1 == $idx;
+
+                my $hdrs_txt = substr( $read_buffer, 0, $idx + 2 * length(CRLF), q<> );
+
+                my $req = HTTP::Response->parse($hdrs_txt);
+
+                my $code = $req->code();
+                die "Must be 101, not “$code”" if $code != 101;
+
+                my $upg = $req->header('upgrade');
+                $upg =~ tr<A-Z><a-z>;
+                die "“Upgrade” must be “websocket”, not “$upg”!" if $upg ne 'websocket';
+
+                my $conn = $req->header('connection');
+                $conn =~ tr<A-Z><a-z>;
+                die "“Upgrade” must be “upgrade”, not “$conn”!" if $conn ne 'upgrade';
+
+                my $accept = $req->header('Sec-WebSocket-Accept');
+                $handshake->validate_accept_or_die($accept);
+
+                $got_handshake = 1;
+            }
+
+            $ept ||= Net::WebSocket::Endpoint::Client->new(
+                out => $inet,
+                parser => Net::WebSocket::Parser->new( $read_fh ),
+            );
+
+            if (my $msg = $ept->get_next_message()) {
+                my $payload = $msg->get_payload();
+                syswrite( \*STDOUT, substr( $payload, 0, 64, q<> ) ) while length $payload;
+            }
+
+            #Handle any control frames we might need to write out.
+            while ( my $frame = $ept->shift_write_queue() ) {
+                $self->write($frame->to_bytes());
+            }
+
+            $timeout->start();
+        },
     );
 
-    my $ept = Net::WebSocket::Endpoint::Client->new(
-        out => $inet,
-        parser => $parser,
+    my $closed;
+
+    my $stdin = IO::Events::stdin->new(
+        owner => $loop,
+        read => 1,
+        on_read => sub {
+            my ($self) = @_;
+
+            my $frame = Net::WebSocket::Frame::binary->new(
+                payload_sr => \$self->read(),
+                mask => Net::WebSocket::Mask::create(),
+            );
+
+            $handle->write($frame->to_bytes());
+        },
+
+        on_close => sub {
+            $closed = 1;
+        },
+
+        on_error => sub {
+            print STDERR "ERROR\n";
+        },
     );
 
     for my $sig (ERROR_SIGS()) {
@@ -142,12 +206,14 @@ sub _mux_after_handshake {
 
             my $code = ($the_sig eq 'INT') ? 'SUCCESS' : 'ENDPOINT_UNAVAILABLE';
 
-            my $frame = Net::WebSocket::Frame::close->new(
-                code => $code,
-                mask => Net::WebSocket::Mask::create(),
-            );
+            $ept->shutdown( code => $code );
 
-            syswrite( $inet, $frame->to_bytes() );
+            while ( my $frame = $ept->shift_write_queue() ) {
+                $handle->write($frame->to_bytes());
+            }
+
+            local $SIG{'PIPE'} = 'IGNORE';
+            $handle->flush();
 
             $SIG{$the_sig} = 'DEFAULT';
 
@@ -155,97 +221,7 @@ sub _mux_after_handshake {
         };
     }
 
-    if ( -t $from_caller ) {
-        $_->blocking(0) for ($from_caller, $inet);
+    $loop->yield() while !$closed;
 
-        my $s = IO::Select->new( $from_caller, $inet );
-
-        while (1) {
-            my ($rdrs_ar, undef, $excs_ar) = IO::Select->select( $s, undef, $s, 10 );
-
-            for my $err (@$excs_ar) {
-                $s->remove($err);
-
-                if ($err == $inet) {
-                    warn "Error in socket reader!";
-                }
-                elsif ($err == $from_caller) {
-                    warn "Error in input reader!";
-                }
-                else {
-                    die "Improper select() error: [$err]";
-                }
-            }
-
-            for my $rdr (@$rdrs_ar) {
-                if ($rdr == $from_caller) {
-                    sysread $from_caller, my $buf, 32768;
-                    _chunk_to_remote($buf, $inet);
-                }
-                elsif ($rdr == $inet) {
-                    if ( my $msg = $ept->get_next_message() ) {
-                        syswrite( $to_caller, $msg->get_payload() );
-                    }
-                }
-                else {
-                    die "Improper reader: [$rdr]";
-                }
-            }
-
-            if (!$rdrs_ar && !$excs_ar) {
-                $ept->check_heartbeat();
-                last if $ept->is_closed();
-            }
-        }
-    }
-    else {
-        while ( sysread $from_caller, my $buf, 32768 ) {
-            _chunk_to_remote( $buf, $inet );
-        }
-
-        my $close_frame = Net::WebSocket::Frame::close->new(
-            code => 'SUCCESS',
-            mask => Net::WebSocket::Mask::create(),
-        );
-
-        syswrite( $inet, $close_frame->to_bytes() );
-
-        shutdown $inet, Socket::SHUT_WR();
-
-        try {
-            while ( my $msg = $ept->get_next_message() ) {
-                syswrite( $to_caller, $msg->get_payload() );
-            }
-        }
-        catch {
-            my $ok;
-            if ( try { $_->isa('Net::WebSocket::X::ReceivedClose') } ) {
-                if ( $_->get('frame')->get_payload() eq $close_frame->get_payload() ) {
-                    $ok = 1;
-                }
-            }
-
-            warn $_ if !$ok;
-        };
-
-        close $inet;
-
-        close $from_caller;
-    }
-
-    return;
-}
-
-sub _chunk_to_remote {
-    my ($buf, $out_fh) = @_;
-
-    syswrite(
-        $out_fh,
-        Net::WebSocket::Frame::binary->new(
-            payload_sr => \$buf,
-            mask => Net::WebSocket::Mask::create(),
-        )->to_bytes(),
-    );
-
-    return;
+    $loop->flush();
 }

@@ -8,6 +8,10 @@ use Test::Deep;
 
 plan tests => 3;
 
+use File::Temp;
+
+use IO::Framed::Read ();
+
 use Net::WebSocket::Parser;
 
 my @tests = (
@@ -70,9 +74,13 @@ my @tests = (
     ],
 );
 
-my $full_buffer = join( q<>, map { $_->[0] } @tests );
-open my $bfh, '<', \$full_buffer;
-my $parser = Net::WebSocket::Parser->new( $bfh );
+(my $in_fh, my $in_path) = File::Temp::tempfile( CLEANUP => 1);
+syswrite( $in_fh, $_->[0] ) for @tests;
+close $in_fh;
+
+open my $bfh, '<', $in_path;
+my $io = IO::Framed::Read->new($bfh);
+my $parser = Net::WebSocket::Parser->new( $io );
 
 for my $t (@tests) {
 

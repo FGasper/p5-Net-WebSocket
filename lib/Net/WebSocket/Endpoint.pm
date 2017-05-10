@@ -15,33 +15,42 @@ See L<Net::WebSocket::Endpoint::Server>.
 use strict;
 use warnings;
 
+use Call::Context ();
+
 use Net::WebSocket::Frame::close ();
 use Net::WebSocket::Frame::ping ();
 use Net::WebSocket::Frame::pong ();
 use Net::WebSocket::Message ();
+use Net::WebSocket::PingStore ();
 use Net::WebSocket::X ();
 
-use constant DEFAULT_MAX_PINGS => 2;
+use constant DEFAULT_MAX_PINGS => 3;
 
 sub new {
     my ($class, %opts) = @_;
 
-    my @missing = grep { !length $opts{$_} } qw( parser out );
-    #die "Missing: [@missing]" if @missing;
+    my @missing = grep { !length $opts{$_} } qw( out parser );
+
+    die "Missing: [@missing]" if @missing;
+
+    if ( !(ref $opts{'out'})->can('write') ) {
+        die "“out” ($opts{'out'}) needs a write() method!";
+    }
 
     my $self = {
         _fragments => [],
 
-        _ping_counter => 0,
         _max_pings => $class->DEFAULT_MAX_PINGS(),
+
+        _ping_store => Net::WebSocket::PingStore->new(),
 
         (map { defined($opts{$_}) ? ( "_$_" => $opts{$_} ) : () } qw(
             parser
-            out
             max_pings
 
             on_data_frame
-            before_send_control_frame
+
+            out
         )),
     };
 
@@ -51,7 +60,7 @@ sub new {
 sub get_next_message {
     my ($self) = @_;
 
-    die "Already closed!" if $self->{'_closed'};
+    $self->_verify_not_closed();
 
     if ( my $frame = $self->{'_parser'}->get_next_frame() ) {
         if ($frame->is_control_frame()) {
@@ -90,6 +99,80 @@ sub get_next_message {
     return undef;
 }
 
+sub check_heartbeat {
+    my ($self) = @_;
+
+    my $ping_counter = $self->{'_ping_store'}->get_count();
+
+    if ($ping_counter == $self->{'_max_pings'}) {
+        my $close = Net::WebSocket::Frame::close->new(
+            $self->FRAME_MASK_ARGS(),
+            code => 'POLICY_VIOLATION',
+        );
+
+        $self->_write_frame($close);
+
+        $self->{'_closed'} = 1;
+    }
+
+    my $ping_message = $self->{'_ping_store'}->add();
+
+    my $ping = Net::WebSocket::Frame::ping->new(
+        payload_sr => \$ping_message,
+        $self->FRAME_MASK_ARGS(),
+    );
+
+    $self->_write_frame($ping);
+
+    return;
+}
+
+sub shutdown {
+    my ($self, %opts) = @_;
+
+    my $close = Net::WebSocket::Frame::close->new(
+        $self->FRAME_MASK_ARGS(),
+        code => $opts{'code'} || 'ENDPOINT_UNAVAILABLE',
+        reason => $opts{'reason'},
+    );
+
+    $self->_write_frame($close);
+
+    $self->{'_closed'} = 1;
+
+    return;
+}
+
+sub is_closed {
+    my ($self) = @_;
+    return $self->{'_closed'} ? 1 : 0;
+}
+
+#----------------------------------------------------------------------
+
+sub on_ping {
+    my ($self, $frame) = @_;
+
+    $self->_write_frame(
+        Net::WebSocket::Frame::pong->new(
+            payload_sr => \$frame->get_payload(),
+            $self->FRAME_MASK_ARGS(),
+        ),
+    );
+
+    return;
+}
+
+sub on_pong {
+    my ($self, $frame) = @_;
+
+    $self->{'_ping_store'}->remove( $frame->get_payload() );
+
+    return;
+}
+
+#----------------------------------------------------------------------
+
 sub _got_continuation_during_non_fragment {
     my ($self, $frame) = @_;
 
@@ -104,7 +187,7 @@ sub _got_continuation_during_non_fragment {
         $self->FRAME_MASK_ARGS(),
     );
 
-    $self->_send_frame($err_frame);
+    $self->_write_frame($err_frame);
 
     die Net::WebSocket::X->create( 'ReceivedBadControlFrame', $msg );
 }
@@ -123,73 +206,18 @@ sub _got_non_continuation_during_fragment {
         $self->FRAME_MASK_ARGS(),
     );
 
-    $self->_send_frame($err_frame);
+    $self->_write_frame($err_frame);
 
     die Net::WebSocket::X->create( 'ReceivedBadControlFrame', $msg );
 }
 
-sub check_heartbeat {
+sub _verify_not_closed {
     my ($self) = @_;
 
-    if ($self->{'_ping_counter'} == $self->{'_max_pings'}) {
-        my $close = Net::WebSocket::Frame::close->new(
-            code => 'POLICY_VIOLATION',
-            $self->FRAME_MASK_ARGS(),
-        );
-        print { $self->{'_out'} } $close->to_bytes();
-        $self->{'_closed'} = 1;
-    }
-
-    my $ping_message = sprintf("%s UTC: $self->{'_ping_counter'} (%s)", scalar(gmtime), rand);
-
-    $self->{'_ping_texts'}{$ping_message} = 1;
-
-    my $ping = Net::WebSocket::Frame::ping->new(
-        payload_sr => \$ping_message,
-        $self->FRAME_MASK_ARGS(),
-    );
-    print { $self->{'_out'} } $ping->to_bytes();
-
-    $self->{'_ping_counter'}++;
+    die "Already closed!" if $self->{'_closed'};
 
     return;
 }
-
-sub is_closed {
-    my ($self) = @_;
-    return $self->{'_closed'} ? 1 : 0;
-}
-
-#----------------------------------------------------------------------
-
-sub on_ping {
-    my ($self, $frame) = @_;
-
-    $self->_send_frame(
-        Net::WebSocket::Frame::pong->new(
-            payload_sr => \$frame->get_payload(),
-            $self->FRAME_MASK_ARGS(),
-        ),
-    );
-
-    return;
-}
-
-sub on_pong {
-    my ($self, $frame) = @_;
-
-    #NB: We expect a response to any ping that we’ve sent; any pong
-    #we receive that doesn’t actually correlate to a ping we’ve sent
-    #is ignored—i.e., it doesn’t reset the ping counter. This means that
-    #we could still timeout even if we’re receiving pongs.
-    if (delete $self->{'_ping_texts'}{$frame->get_payload()}) {
-        $self->{'_ping_counter'} = 0;
-    }
-
-    return;
-}
-
-#----------------------------------------------------------------------
 
 sub _handle_control_frame {
     my ($self, $frame) = @_;
@@ -199,6 +227,7 @@ sub _handle_control_frame {
     my $type = $frame->get_type();
 
     if ($type eq 'close') {
+        $self->{'_received_close'} = 1;
         $self->{'_closed'} = 1;
 
         my ($code, $reason) = $frame->get_code_and_reason();
@@ -209,9 +238,7 @@ sub _handle_control_frame {
             $self->FRAME_MASK_ARGS(),
         );
 
-        local $SIG{'PIPE'} = 'IGNORE';
-
-        $self->_send_frame($resp_frame);
+        $self->_write_frame( $resp_frame );
 
         die Net::WebSocket::X->create('ReceivedClose', $frame);
     }
@@ -229,16 +256,10 @@ sub _handle_control_frame {
     return;
 }
 
-sub _send_frame {
-    my ($self, $frame) = @_;
+sub _write_frame {
+    my ($self, $frame, $todo_cr) = @_;
 
-    if ($self->can('_before_send_frame')) {
-        $self->_before_send_frame($frame);
-    }
-
-    print { $self->{'_out'} } $frame->to_bytes();
-
-    return;
+    return $self->{'_out'}->write($frame->to_bytes(), $todo_cr);
 }
 
 1;

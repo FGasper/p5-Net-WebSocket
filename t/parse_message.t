@@ -2,19 +2,27 @@
 
 use strict;
 use warnings;
-use autodie;
+
+BEGIN {
+    eval 'use autodie';
+}
 
 use Test::More;
 use Test::Deep;
+
+use File::Slurp;
+use File::Temp;
+
+use IO::Framed::ReadWrite::Blocking ();
 
 plan tests => 6;
 
 use Net::WebSocket::Endpoint::Server ();
 use Net::WebSocket::Parser ();
 
-my $out_buffer = q<>;
-
 my $full_buffer;
+
+(undef, my $out_path) = File::Temp::tempfile( CLEANUP => 1);
 
 my @tests = (
     [
@@ -52,9 +60,10 @@ my @tests = (
     [
         "\x89\x0bHello-ping\x0a" . "\x82\x00",
         sub {
-            open my $read_out_fh, '<', \$out_buffer;
+            open my $read_out_fh, '<', $out_path;
 
-            my $out_parser = Net::WebSocket::Parser->new( $read_out_fh );
+            my $io = IO::Framed::ReadWrite::Blocking->new($read_out_fh);
+            my $out_parser = Net::WebSocket::Parser->new( $io );
 
             cmp_deeply(
                 $out_parser->get_next_frame(),
@@ -100,9 +109,10 @@ my @tests = (
                 'fragmented double hello with ping in the middle',
             ) or diag explain $_;
 
-            open my $read_out_fh, '<', \$out_buffer;
+            open my $read_out_fh, '<', $out_path;
 
-            my $out_parser = Net::WebSocket::Parser->new( $read_out_fh );
+            my $io = IO::Framed::ReadWrite::Blocking->new($read_out_fh);
+            my $out_parser = Net::WebSocket::Parser->new( $io );
 
             my $resp = $out_parser->get_next_frame();
 
@@ -118,25 +128,33 @@ my @tests = (
                         get_mask_bytes => q<>,
                     ),
                 ),
-                'ping in the middle comes out as expected',
-            ) or diag explain [$resp, sprintf( "%v.02x", $out_buffer )];
+                'ping in the middle gets a reply as expected',
+            );
         },
     ],
 );
 
-$full_buffer = join( q<>, map { $_->[0] } @tests );
-open my $full_read_fh, '<', \$full_buffer;
-my $parser = Net::WebSocket::Parser->new( $full_read_fh );
+(my $in_fh, my $in_path) = File::Temp::tempfile( CLEANUP => 1);
+syswrite( $in_fh, $_->[0] ) for @tests;
+close $in_fh;
 
-open my $out_fh, '>>', \$out_buffer;
+open my $full_read_fh, '<', $in_path;
+
+open my $out_fh, '>>', $out_path;
+
+$out_fh->blocking(1);
+
+my $io = IO::Framed::ReadWrite::Blocking->new( $full_read_fh, $out_fh );
+
+my $parser = Net::WebSocket::Parser->new( $io );
 
 my $ept = Net::WebSocket::Endpoint::Server->new(
     parser => $parser,
-    out => $out_fh,
+    out => $io,
 );
 
 for my $t (@tests) {
-    substr( $out_buffer, 0 ) = q<>;
+    truncate $out_fh, 0;
 
     my $msg;
 

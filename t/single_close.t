@@ -9,6 +9,8 @@ plan tests => 12;
 
 use File::Temp ();
 
+use IO::Framed::Read;
+
 use Net::WebSocket::Parser;
 use Net::WebSocket::Mask ();
 
@@ -43,15 +45,20 @@ for my $t (@tests) {
 
     for my $tt ( [ unmasked => $raw ], [ masked => $raw_masked ] ) {
         my $bin = $tt->[1];
-        open my $sfh, '<', \$bin;
-        my $sr_parse = Net::WebSocket::Parser->new( $sfh );
+
+        my ( $bfh, $bpath ) = File::Temp::tempfile( CLEANUP => 1 );
+        syswrite( $bfh, $tt->[1] );
+        close $bfh;
+
+        open my $sfh, '<', $bpath;
+        my $sr_parse = Net::WebSocket::Parser->new( IO::Framed::Read->new($sfh) );
 
         my ($fh, $path) = File::Temp::tempfile( CLEANUP => 1 );
         print {$fh} $bin or die $!;
         close $fh;
 
         open my $rfh, '<', $path;
-        my $fh_parse = Net::WebSocket::Parser->new( $rfh );
+        my $fh_parse = Net::WebSocket::Parser->new( IO::Framed::Read->new($rfh) );
 
         for my $ttt ( [ scalar => $sr_parse ], [ filehandle => $fh_parse ] ) {
             my $frame = $ttt->[1]->get_next_frame();

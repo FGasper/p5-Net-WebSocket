@@ -12,6 +12,8 @@ use Test::Deep;
 
 use IO::Select ();
 
+use IO::Framed::Read ();
+
 use Net::WebSocket::Parser ();
 
 my @tests = (
@@ -48,7 +50,9 @@ for my $t (@tests) {
 
     my $frame;
 
-    my $parser = Net::WebSocket::Parser->new( $rdr );
+    my $io = IO::Framed::Read->new($rdr);
+
+    my $parser = Net::WebSocket::Parser->new( $io );
 
     my $ios = IO::Select->new($rdr);
 
@@ -56,9 +60,17 @@ for my $t (@tests) {
 
     while (!$frame) {
         syswrite $wtr, substr( $bytes, 0, 1, q<> );
-        my ($rdrs_ar) = IO::Select->select( $ios );
+        my ($rdrs_ar, undef, $excs_ar) = IO::Select->select( $ios, undef, $ios );
 
-        last if !$rdrs_ar || !@$rdrs_ar;
+        if (@$excs_ar) {
+            warn "select() indicated an error??";
+            last;
+        }
+
+        if (!$rdrs_ar || !@$rdrs_ar) {
+            die "Nothing to read, but no frame? ($!)" if !$frame;
+            last;
+        }
 
         $frame = $parser->get_next_frame();
     }
@@ -66,11 +78,11 @@ for my $t (@tests) {
     cmp_deeply(
         $frame,
         all(
+            Isa('Net::WebSocket::Frame'),
             methods(
                 get_type => 'text',
                 get_payload => $t->{'payload'},
             ),
-            Isa('Net::WebSocket::Frame'),
         ),
         "$t->{'label'}: partial frame",
     ) or diag explain $frame;

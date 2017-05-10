@@ -35,6 +35,13 @@ my $server = IO::Socket::INET->new(
     Listen => 2,
 );
 
+#This is a “lazy” example. A more robust, production-level
+#solution would not need to fork() unless there were privilege
+#drops or some such that necessitate separate processes per session.
+
+#For an example of a non-forking server in Perl, look at Net::WAMP’s
+#router example.
+
 while ( my $sock = $server->accept() ) {
     fork and next;
 
@@ -62,16 +69,20 @@ while ( my $sock = $server->accept() ) {
     my $cur_number = 0;
 
     while (!$ept->is_closed()) {
-        my ( $rdrs_ar, $s, $errs_ar ) = IO::Select->select( $s, $s, $s, 1 );
+        my $write_s = $ept->get_write_queue_size() ? $s : undef;
+
+        my ( $rdrs_ar, $wtrs_ar, $errs_ar ) = IO::Select->select( $s, $write_s, $s, 1 );
 
         my $is_final = ($cur_number == 2);
 
         my $method = $is_final ? 'create_final' : 'create_chunk';
 
-        syswrite(
-            $sock,
-            $streamer->$method($cur_number)->to_bytes(),
-        );
+        if ( $wtrs_ar && @$wtrs_ar ) {
+            syswrite(
+                $sock,
+                $streamer->$method($cur_number)->to_bytes(),
+            );
+        }
 
         $cur_number++;
         $cur_number %= 3;

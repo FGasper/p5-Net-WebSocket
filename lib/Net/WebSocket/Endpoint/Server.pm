@@ -10,16 +10,18 @@ Net::WebSocket::Endpoint::Server
 
     my $ept = Net::WebSocket::Endpoint::Server->new(
         parser => $parser_obj,
+
         out => $out_fh,
 
         #optional, # of pings to send before we send a close
         max_pings => 5,
 
+        #optional
         on_data_frame => sub {
-            my ($frame) = @_;
+            my ($frame_obj) = @_;
 
             #...
-        }
+        },
     );
 
     if ( _we_timed_out_waiting_for_read_readiness() ) {
@@ -27,10 +29,24 @@ Net::WebSocket::Endpoint::Server
     }
     else {
 
+        #Only necessary for non-blocking I/O;
+        #it’s meaningless in blocking I/O.
+        #See below for an alternative pattern for use with POE, etc.
+        if ( $ept->get_write_queue_size() ) {
+            $ept->flush_write_queue();
+        }
+
         #This should only be called when reading won’t produce an error.
         #For example, in non-blocking I/O you’ll need a select() in front
         #of this. (Blocking I/O can just call it and wait!)
         $ept->get_next_message();
+
+        #INSTEAD OF flush_write_queue(), you might want to send the write
+        #queue off to a multiplexing framework like POE, for which this
+        #would be useful:
+        while ( my $frame = $ept->shift_write_queue() ) {
+            #… do something with $frame->to_bytes() -- probably send it
+        }
 
         #Check for this at the end of each cycle.
         _custom_logic_to_finish_up() if $ept->is_closed();
@@ -53,9 +69,7 @@ Instantiate the class. Nothing is actually done here. Options are:
 
 =over
 
-=item * C<parser> (required) - An instance of L<Net::WebSocket::Parser>
-
-=item * C<out> (required) - The endpoint’s output filehandle
+=item * C<parser> (required) - An instance of L<Net::WebSocket::Parser>.
 
 =item * C<max_pings> (optional) - The maximum # of pings to send before
 we send a C<close> frame (which ends the session).
@@ -73,6 +87,14 @@ If you want to avoid buffering a large message, you can do this:
             fin => $_[0]->get_fin(),
         );
     },
+
+=item * C<out> (optional) - The endpoint’s output filehandle. This is only
+useful if your output is a blocking filehandle; otherwise, you should
+process the write queue manually via C<shift_write_queue()>.
+
+=item * C<before_send_frame> (optional) - A callback to be executed before
+the endpoint sends a ping, pong, or close frame. It receives as an argument
+the frame that will be sent.
 
 =back
 
@@ -98,6 +120,26 @@ a PROTOCOL_ERROR close frame.
 
 This method may not be called after a close frame has been sent (i.e.,
 if the C<is_closed()> method returns true).
+
+B<NOTE:> If the “out” file handle given to the constructor is in
+non-blocking mode, then any response frames will be queued rather than
+sent immediately. That’s where the next method comes in …
+
+=head2 I<OBJ>->flush_write_queue()
+
+Only useful in non-blocking I/O contexts—and at that, probably
+only useful when you’re not using an event loop, since that loop will
+likely do its own write buffering.
+
+This will attempt to flush one frame from the write queue. If only part
+of the message is written, then the next call to this method will resume
+the output of that message.
+
+=head2 I<OBJ>->shift_write_queue()
+
+This is useful when you have an event loop so that you can feed the frames
+from the Endpoint object’s queue into the event loop’s write queue.
+It returns a single frame object, or undef if the queue is empty.
 
 =head2 I<OBJ>->check_heartbeat()
 

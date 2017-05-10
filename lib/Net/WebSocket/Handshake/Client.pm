@@ -16,18 +16,35 @@ Net::WebSocket::Handshake::Client
         #optional
         subprotocols => [ 'echo', 'haha' ],
 
+        #optional, to imitate a web client
+        origin => ..,
+
         #optional, base 64 .. auto-created if not given
         key => '..',
     );
 
-    #Includes only one trailing CRLF, so you can add additional headers
-    my $txt = $hsk->create_header_text();
+    #Note the need to conclude the header text manually.
+    #This is by design, so you can add additional headers.
+    my $hdr = $hsk->create_header_text() . "\x0d\x0a";
 
     my $b64 = $hsk->get_key();
 
     #Validates the value of the “Sec-WebSocket-Accept” header;
     #throws Net::WebSocket::X::BadAccept if not.
     $hsk->validate_accept_or_die($accent_value);
+
+=head1 DESCRIPTION
+
+This class implements WebSocket handshake logic for a client.
+
+Because Net::WebSocket tries to be agnostic about how you parse your HTTP
+headers, this class doesn’t do a whole lot for you: it’ll create a base64
+key for you and create “starter” headers for you. It also can validate
+the C<Sec-WebSocket-Accept> header value from the server.
+
+B<NOTE:> C<create_header_text()> does NOT provide the extra trailing
+CRLF to conclude the HTTP headers. This allows you to add additional
+headers beyond what this class gives you.
 
 =cut
 
@@ -37,8 +54,6 @@ use warnings;
 use parent qw( Net::WebSocket::Handshake::Base );
 
 use URI::Split ();
-
-use Module::Load ();
 
 use Net::WebSocket::Constants ();
 use Net::WebSocket::X ();
@@ -117,9 +132,10 @@ sub get_key {
 
 sub _create_key {
     Module::Load::load('MIME::Base64') if !MIME::Base64->can('encode');
-    Module::Load::load('Net::WebSocket::RNG') if !Net::WebSocket::RNG->can('get');
 
-    my $b64 = MIME::Base64::encode_base64( Net::WebSocket::RNG::get()->bytes(16) );
+    my $sixteen_bytes = pack 'S8', map { rand 65536 } 1 .. 8;
+
+    my $b64 = MIME::Base64::encode_base64($sixteen_bytes);
     chomp $b64;
 
     return $b64;
