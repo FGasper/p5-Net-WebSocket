@@ -51,23 +51,30 @@ constants that L<Microsoft defines|https://msdn.microsoft.com/en-us/library/wind
 
 =over
 
-=item * SUCCESS (1000)
+=item * C<SUCCESS> (1000)
 
-=item * ENDPOINT_UNAVAILABLE (1001)
+=item * C<ENDPOINT_UNAVAILABLE> (1001)
 
-=item * PROTOCOL_ERROR (1002)
+=item * C<PROTOCOL_ERROR> (1002)
 
-=item * INVALID_DATA_TYPE (1003)
+=item * C<INVALID_DATA_TYPE> (1003)
 
-=item * INVALID_PAYLOAD (1007)
+=item * C<INVALID_PAYLOAD> (1007)
 
-=item * POLICY_VIOLATION (1008)
+=item * C<POLICY_VIOLATION> (1008)
 
-=item * MESSAGE_TOO_BIG (1009)
+=item * C<MESSAGE_TOO_BIG> (1009)
 
-=item * UNSUPPORTED_EXTENSIONS (1010)
+=item * C<UNSUPPORTED_EXTENSIONS> (1010)
 
-=item * SERVER_ERROR (1011)
+=item * C<SERVER_ERROR> (1011)
+
+NOTE: As per L<erratum|https://www.rfc-editor.org/errata_search.php?rfc=6455>
+3227, this status is meant to encompass client errors as well. Since these
+constants are meant to match Microsoft’s (in default of such in the actual
+WebSocket standard), however, Net::WebSocket only recognizes C<SERVER_ERROR>
+as an alias of 1011. Hopefully a future update to the WebSocket standard will
+include useful string aliases for the status codes.
 
 =back
 
