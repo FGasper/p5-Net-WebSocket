@@ -67,7 +67,7 @@ a UNIX socket, ordinary TCP/IP, some funky C<tie()>d object, or whatever.
 Net::WebSocket also “has no opinions” about how you should do I/O or HTTP
 headers. As a result of this “bare-bones” approach, Net::WebSocket can likely
 fit your project; however, it won’t absolve you of the need to know some
-things aboutthe WebSocket protocol itself. There are some examples
+things about the WebSocket protocol itself. There are some examples
 of how you might write complete applications (client or server)
 in the distribution’s C<demo/> directory.
 
@@ -172,7 +172,7 @@ protocol, all of which Net::WebSocket supports:
 
 =item * The three reserved bits in each frame’s header.
 (See L<Net::WebSocket::Frame>.) This is used, e.g., in the
-L<https://tools.ietf.org/html/rfc7692|permessage-deflate extension>.
+L<permessage-deflate extension|https://tools.ietf.org/html/rfc7692>.
 
 =item * Additional opcodes: 3-7 and 11-15. You’ll need to subclass
 L<Net::WebSocket::Frame> for this, and you will likely want to subclass

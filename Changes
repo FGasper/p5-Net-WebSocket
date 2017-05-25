@@ -65,4 +65,5 @@ Revision history for Perl module Net::WebSocket
 0.031 Tue May 9 2017
 - Sync documentation with 0.03 API changes
 
-Document SERVER_ERROR anomaly re RFC erratum
+- Document SERVER_ERROR anomaly re RFC erratum
+- Straighten out a bit of POD in the main distro docs
