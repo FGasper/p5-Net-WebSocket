@@ -33,22 +33,34 @@ sub get_server_handshake_from_text {
 
     my $key = $req->header('Sec-WebSocket-Key');
 
-    return Net::WebSocket::Handshake::Server->new(
-        key => $key,
+    return (
+        $req,
+        Net::WebSocket::Handshake::Server->new(
+            key => $key,
+        ),
     );
 }
 
 sub handshake_as_server {
-    my ($inet) = @_;
+    my ($inet, $req_handler) = @_;
 
     my $buf = q<>;
-    my $hsk;
+    my ($req, $hsk);
     while ( IO::SigGuard::sysread($inet, $buf, MAX_CHUNK_SIZE, length $buf ) ) {
-        $hsk = get_server_handshake_from_text($buf);
+        ($req, $hsk) = get_server_handshake_from_text($buf);
         last if $hsk;
     }
 
-    print { $inet } $hsk->create_header_text() . CRLF;
+    die "read(): $!" if $!;
+
+    my $hdr_text = $hsk->create_header_text();
+
+    my @extra_headers;
+    if ($req_handler) {
+        $hdr_text .= $_ . CRLF for $req_handler->($req);
+    }
+
+    print { $inet } $hdr_text . CRLF or die "send(): $!";
 
     return;
 }

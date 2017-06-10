@@ -22,9 +22,13 @@ use Net::WebSocket::Frame::close  ();
 use Net::WebSocket::Handshake::Client ();
 use Net::WebSocket::Parser ();
 
-use constant MAX_CHUNK_SIZE => 64000;
+use Net::WebSocket::PMCE::deflate ();
 
-use constant CRLF => "\x0d\x0a";
+use constant {
+    MAX_CHUNK_SIZE => 64000,
+    CRLF => "\x0d\x0a",
+    DEBUG => 1,
+};
 
 #No PIPE
 use constant ERROR_SIGS => qw( INT HUP QUIT ABRT USR1 USR2 SEGV ALRM TERM );
@@ -83,13 +87,13 @@ sub run {
         timeout => 5,
         repetitive => 1,
         on_tick => sub {
+            die "Handshake timeout!\n" if !$ept;
+
             $ept->check_heartbeat();
 
             #Handle any control frames we might need to write out,
             #esp. pings.
-            while ( my $frame = $ept->shift_write_queue() ) {
-                $handle->write($frame->to_bytes());
-            }
+            #TODO
         },
     );
 
@@ -98,9 +102,9 @@ sub run {
     my $sent_handshake;
     my $got_handshake;
 
-    my $read_buffer = q<>;
+    my $use_deflate;
 
-    open my $read_fh, '<', \$read_buffer;
+    my $read_obj = My::Reader->new();
 
     my $handshake;
 
@@ -121,6 +125,8 @@ sub run {
 
             my $hdr = $handshake->create_header_text();
 
+            $hdr .= "Sec-WebSocket-Extension: permessage-deflate" . CRLF;
+
             $self->write( $hdr . CRLF );
 
             $sent_handshake = 1;
@@ -129,13 +135,15 @@ sub run {
         on_read => sub {
             my ($self) = @_;
 
-            $read_buffer .= $self->read();
+            $read_obj->add( $self->read() );
 
             if (!$got_handshake) {
-                my $idx = index($read_buffer, CRLF . CRLF);
+                my $idx = index($read_obj->get(), CRLF . CRLF);
                 return if -1 == $idx;
 
-                my $hdrs_txt = substr( $read_buffer, 0, $idx + 2 * length(CRLF), q<> );
+                _debug('received handshake');
+
+                my $hdrs_txt = $read_obj->read( $idx + 2 * length(CRLF) );
 
                 my $req = HTTP::Response->parse($hdrs_txt);
 
@@ -153,22 +161,34 @@ sub run {
                 my $accept = $req->header('Sec-WebSocket-Accept');
                 $handshake->validate_accept_or_die($accept);
 
+                #TODO: Make it picky
+                $use_deflate = ($req->header('Sec-WebSocket-Extension') eq 'permessage-deflate');
+                _debug("deflate? [$use_deflate]");
+
                 $got_handshake = 1;
             }
 
             $ept ||= Net::WebSocket::Endpoint::Client->new(
-                out => $inet,
-                parser => Net::WebSocket::Parser->new( $read_fh ),
+                out => $handle,
+                parser => Net::WebSocket::Parser->new( $read_obj ),
             );
 
             if (my $msg = $ept->get_next_message()) {
-                my $payload = $msg->get_payload();
+                my $payload;
+
+                if ($use_deflate && Net::WebSocket::PMCE::deflate::message_is_compressed($msg)) {
+                    $payload = Net::WebSocket::PMCE::deflate::get_decompressed_payload($msg);
+                }
+                else {
+                    $payload = $msg->get_payload();
+                }
+
                 syswrite( \*STDOUT, substr( $payload, 0, 64, q<> ) ) while length $payload;
             }
 
             #Handle any control frames we might need to write out.
-            while ( my $frame = $ept->shift_write_queue() ) {
-                $self->write($frame->to_bytes());
+            while ( my $msg = $ept->get_next_message() ) {
+                $self->write($msg->to_bytes());
             }
 
             $timeout->start();
@@ -187,6 +207,10 @@ sub run {
                 payload_sr => \$self->read(),
                 mask => Net::WebSocket::Mask::create(),
             );
+
+            if ($use_deflate) {
+                Net::WebSocket::PMCE::deflate::compress_frame($frame);
+            }
 
             $handle->write($frame->to_bytes());
         },
@@ -208,9 +232,8 @@ sub run {
 
             $ept->shutdown( code => $code );
 
-            while ( my $frame = $ept->shift_write_queue() ) {
-                $handle->write($frame->to_bytes());
-            }
+            #$framed_obj->flush_write_queue();
+            #TODO
 
             local $SIG{'PIPE'} = 'IGNORE';
             $handle->flush();
@@ -225,3 +248,38 @@ sub run {
 
     $loop->flush();
 }
+
+sub _debug {
+    print STDERR "DEBUG: $_[0]$/" if DEBUG;
+}
+
+#----------------------------------------------------------------------
+# We’d ordinarily use IO::Framed for this, but IO::Handle already reads
+# from the filehandle. So, this implements the needed read() interface
+# to imitate IO::Framed::Read for Net::WebSocket::Parser.
+
+package My::Reader;
+
+sub new {
+    my ($class) = @_;
+
+    my $self = q<>;
+
+    return bless \$self, $class;
+}
+
+sub add {
+    ${ $_[0] } .= $_[1];
+
+    return;
+}
+
+sub get {
+    return ${ $_[0] };
+}
+
+sub read {
+    return substr( ${ $_[0] }, 0, $_[1], q<> );
+}
+
+1;
