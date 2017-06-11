@@ -21,7 +21,7 @@ WriteMakefile1(
     ABSTRACT_FROM => 'lib/Net/WebSocket.pm',
     LICENSE      => 'perl',
 
-    #Bleh. Hopefully can improve.
+    #Bleh. Hopefully can add support for older versions.
     MIN_PERL_VERSION => 5.014000,
 
     PREREQ_PM    => {
@@ -34,6 +34,7 @@ WriteMakefile1(
         'Digest::SHA' => 0,
         'URI::Split' => 0,
         'Call::Context' => 0,
+        'HTTP::Headers::Util' => 0,
     },
 
     TEST_REQUIRES => {

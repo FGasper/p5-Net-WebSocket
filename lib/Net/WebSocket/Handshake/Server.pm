@@ -76,9 +76,9 @@ sub _create_header_lines {
 
         'Sec-WebSocket-Accept: ' . $self->get_accept(),
 
-        $self->_encode_subprotocols(),
+        $self->_encode_extensions(),
 
-        #'Sec-WebSocket-Extensions: ',
+        $self->_encode_subprotocols(),
     );
 }
 

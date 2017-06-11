@@ -125,7 +125,7 @@ sub run {
 
             my $hdr = $handshake->create_header_text();
 
-            $hdr .= "Sec-WebSocket-Extension: permessage-deflate" . CRLF;
+            $hdr .= "Sec-WebSocket-Extensions: permessage-deflate" . CRLF;
 
             $self->write( $hdr . CRLF );
 
@@ -162,7 +162,7 @@ sub run {
                 $handshake->validate_accept_or_die($accept);
 
                 #TODO: Make it picky
-                $use_deflate = ($req->header('Sec-WebSocket-Extension') eq 'permessage-deflate');
+                $use_deflate = ($req->header('Sec-WebSocket-Extensions') eq 'permessage-deflate');
                 _debug("deflate? [$use_deflate]");
 
                 $got_handshake = 1;

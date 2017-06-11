@@ -1,80 +1,298 @@
 package Net::WebSocket::PMCE::deflate;
 
+=encoding utf-8
+
+=head1 NAME
+
+Net::WebSocket::PMCE::deflate - WebSocket’s C<permessage-deflate> extension
+
+=head1 SYNOPSIS
+
+    use Net::WebSocket::PMCE::deflate ();
+
+    my $deflate = Net::WebSocket::PMCE::deflate->new( ... );
+
+    my $decompressed = $pmce->inflate($payload);
+
+    #NB: a static function!
+    Net::WebSocket::PMCE::deflate::validate_max_window_bits($bits);
+
+=head1 DESCRIPTION
+
+This class implements C<permessage-deflate> as defined in
+L<RFC 7692|https://tools.ietf.org/html/rfc7692>.
+
+If you’re looking for an implementation of C<permessage-deflate>,
+look at L<Net::WebSocket::PMCE::deflate>.
+
+=head1 STATUS
+
+This module is an ALPHA release. Changes to the API are not unlikely;
+be sure to check the changelog before updating, and please report any
+issues you find.
+
+=head1 STATIC FUNCTIONS
+
+=cut
+
 use strict;
 use warnings;
 
-use IO::Compress::Deflate ();
-use IO::Uncompress::Inflate ();
+use parent 'Net::WebSocket::PMCE';
 
-use constant CONSTRUCTOR_NEEDS => ();
+use Call::Context ();
+
+use Net::WebSocket::X ();
+
+my $zlib_is_loaded;
+
+my @VALID_MAX_WINDOW_BITS = qw( 8 9 10 11 12 13 14 15 );
+
+use constant {
+    TOKEN => 'permessage-deflate',
+    _ZLIB_SYNC_TAIL => "\0\0\xff\xff",
+    _DEBUG => 1,
+};
+
+=head2 validate_max_window_bits( BITS )
+
+This validates a value given in either the C<server_max_window_bits>
+or C<client_max_window_bits> handshake parameters. This function considers an
+undefined value to be an error, so you need to check
+whether C<client_max_window_bits> was given with a value or not.
+
+=cut
+
+sub validate_max_window_bits {
+    my ($bits) = @_;
+
+    if (defined $bits) {
+        return if grep { $_ eq $bits } @VALID_MAX_WINDOW_BITS;
+
+        die Net::WebSocket::X->create( 'BadArg', "Must be one of: [@VALID_MAX_WINDOW_BITS]" );
+    }
+
+    die Net::WebSocket::X->create( 'BadArg', "Must have a value, one of: [@VALID_MAX_WINDOW_BITS]" );
+}
+
+=head1 METHODS
+
+This class inherits all methods from L<Net::WebSocket::PMCE> and adds
+a few more:
+
+=head2 I<CLASS>->new( %OPTS )
+
+Returns a new instance of this class.
+
+C<%OPTS> is:
+
+=over
+
+=item C<deflate_max_window_bits> - optional; the number of window bits to use
+for compressing messages. This should correspond with local endpoint’s
+behavior; i.e., for a server, this should match the C<server_max_window_bits>
+extension parameter in the WebSocket handshake.
+
+=item C<inflate_max_window_bits> - optional; the number of window bits to use
+for decompressing messages. This should correspond with remote peer’s
+behavior; i.e., for a server, this should match the C<client_max_window_bits>
+extension parameter in the WebSocket handshake.
+
+=item C<local_no_context_takeover> - corresponds to either the
+C<client_no_context_takeover> or C<server_no_context_takeover> parameter,
+to match the local endpoint’s role. When this flag is set, the object
+will do a full flush at the end of each C<compress_frame()> or
+C<compress_message()> call. (It is thus advantageous to favor
+C<compress_message()> when this flag is active.)
+
+=back
+
+=cut
 
 sub new {
     my ($class, %opts) = @_;
 
-    my @lack = grep { !length $opts{$_} } CONSTRUCTOR_NEEDS();
-    die "Need: [@lack]" if @lack;
-
     return bless \%opts, $class;
 }
 
-sub frame_is_compressed {
-    my ($frame) = @_;
+our $_full_flush_frame;
 
-    return $frame->has_rsv1();
-}
-
-sub message_is_compressed {
-    my ($msg) = @_;
-
-    return frame_is_compressed( ($msg->get_frames())[0] );
-}
-
+#This gets called from SUPER::compress_message(), so we have to
+#make sure that there isn’t already a frame marked as the one that
+#gets a full flush.
 sub compress_frame {
-    my ($frame) = @_;
+    local $_full_flush_frame = $_[1] if $_[0]{'local_no_context_takeover'} && !$_full_flush_frame;
 
-    _compress_frame_payload($frame);
-
-    $frame->set_rsv1();
-
-    return $frame;
+    return $_[0]->SUPER::compress_frame($_[1]);
 }
 
 sub compress_message {
-    my ($msg) = @_;
+    local $_full_flush_frame = ($_[0]->get_frames())[-1] if $_[0]{'local_no_context_takeover'};
 
-    my @frames = $msg->get_frames();
-    _compress_frame_payload($_) for @frames;
-
-    $frames[0]->set_rsv1();
-
-    return $msg;
+    return $_[0]->SUPER::compress_message($_[1]);
 }
 
-sub get_decompressed_payload {
-    my ($msg_or_frame) = @_;
+=head2 $decompressed = I<OBJ>->decompress( COMPRESSED_PAYLOAD )
 
-    IO::Uncompress::Inflate::inflate(
-        \$msg_or_frame->get_payload(),
-        \(my $v),
-    ) or die "inflate(): $IO::Uncompress::Inflate::InflateError";
+Decompresses the given string and returns the result.
+
+B<NOTE:> This function alters COMPRESSED_PAYLOAD.
+
+=cut
+
+#cf. RFC 7692, 7.2.2
+sub decompress {
+    my ($self) = @_;    #$_[1] = payload
+
+    $self->{'i'} ||= $self->_create_inflate_obj();
+
+    $_[1] .= _ZLIB_SYNC_TAIL;
+
+    _debug(sprintf "inflating: %v.02x\n", $_[1]) if _DEBUG;
+
+    my $status = $self->{'i'}->inflate($_[1], my $v);
+    die $status if $status != Compress::Raw::Zlib::Z_OK();
+
+    _debug(sprintf "inflate output: [%v.02x]\n", $v) if _DEBUG;
 
     return $v;
 }
 
-sub _compress_frame_payload {
-    my ($frame) = @_;
+#----------------------------------------------------------------------
 
-    IO::Compress::Deflate::deflate(
-        \$frame->get_payload(),
-        \(my $v),
-    ) or die "inflate(): $IO::Compress::Deflate::DeflateError";
+#Used by subclasses
+sub _consume_header_parts {
+    my ($self, $extensions_ar, $foreach_cr) = @_;
 
-    $frame->set_payload_sr( \$v );
+    my $use_ext;
+
+    for my $ext_ar (@$extensions_ar) {
+        next if $ext_ar->[0] ne TOKEN();
+        $use_ext = 1;
+
+        my %opts = @{$ext_ar}[ 1 .. $#$ext_ar ];
+
+        $foreach_cr->(\%opts);
+
+        if (%opts) {
+            my @list = %opts;
+            warn "Unrecognized: @list";
+        }
+    }
+
+    return $use_ext;
+}
+
+#----------------------------------------------------------------------
+
+sub _load_zlib_if_needed {
+    $zlib_is_loaded ||= do {
+        Module::Load::load('Compress::Raw::Zlib');
+        1;
+    };
 
     return;
 }
 
+sub _create_inflate_obj {
+    my ($self) = @_;
+
+    _load_zlib_if_needed();
+
+    my $window_bits = $self->{'inflate_max_window_bits'} || $VALID_MAX_WINDOW_BITS[-1];
+
+    my ($inflate, $istatus) = Compress::Raw::Zlib::Inflate->new(
+        -WindowBits => -$window_bits,
+        -AppendOutput => 1,
+    );
+    die "Inflate: $istatus" if $istatus != Compress::Raw::Zlib::Z_OK();
+
+    return $inflate;
+}
+
+sub _create_deflate_obj {
+    my ($self) = @_;
+
+    _load_zlib_if_needed();
+
+    my $window_bits = $self->{'deflate_max_window_bits'} || $VALID_MAX_WINDOW_BITS[-1];
+
+    my ($deflate, $dstatus) = Compress::Raw::Zlib::Deflate->new(
+        -WindowBits => -$window_bits,
+        -AppendOutput => 1,
+    );
+    die "Deflate: $dstatus" if $dstatus != Compress::Raw::Zlib::Z_OK();
+
+    return $deflate;
+}
+
+#cf. RFC 7692, 7.2.1
+sub _compress_frame {
+    my ($self, $frame) = @_;
+
+    $self->{'d'} ||= $self->_create_deflate_obj();
+
+    _debug(sprintf "to deflate: [%v.02x]", $frame->get_payload()) if _DEBUG;
+
+    my $dstatus = $self->{'d'}->deflate( $frame->get_payload(), my $out );
+    die "deflate: $dstatus" if $dstatus != Compress::Raw::Zlib::Z_OK();
+
+    _debug(sprintf "post-deflate output: [%v.02x]", $out) if _DEBUG;
+
+    if ( $_full_flush_frame && $_full_flush_frame eq $frame ) {
+        $dstatus = $self->{'d'}->flush($out, Compress::Raw::Zlib::Z_FULL_FLUSH());
+    }
+    else {
+        $dstatus = $self->{'d'}->flush($out, Compress::Raw::Zlib::Z_SYNC_FLUSH());
+    }
+
+    die "deflate flush: $dstatus" if $dstatus != Compress::Raw::Zlib::Z_OK();
+
+    _debug(sprintf "post-flush output: [%v.02x]", $out) if _DEBUG;
+
+    #NB: The RFC directs at this point that:
+    #
+    #If the resulting data does not end with an empty DEFLATE block
+    #with no compression (the "BTYPE" bits are set to 00), append an
+    #empty DEFLATE block with no compression to the tail end.
+    #
+    #… but I don’t know the protocol well enough to detect that??
+
+    if ( substr($out, -4) eq _ZLIB_SYNC_TAIL ) {
+        substr($out, -4) = q<>;
+    }
+    else {
+        die sprintf('deflate/flush didn’t end with expected SYNC tail (00.00.ff.ff): %v.02x', $out);
+    }
+
+    $frame->set_payload_sr( \$out );
+
+    return;
+}
+
+sub _debug {
+    print STDERR "$_[0]$/";
+}
+
 1;
+
+=head1 REPOSITORY
+
+L<https://github.com/FGasper/p5-Net-WebSocket>
+
+=head1 AUTHOR
+
+Felipe Gasper (FELIPE)
+
+=head1 COPYRIGHT
+
+Copyright 2017 by L<Gasper Software Consulting, LLC|http://gaspersoftware.com>
+
+=head1 LICENSE
+
+This distribution is released under the same license as Perl.
+
+=cut
 
 __END__
 

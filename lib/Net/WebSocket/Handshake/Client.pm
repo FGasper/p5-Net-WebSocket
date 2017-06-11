@@ -21,6 +21,9 @@ Net::WebSocket::Handshake::Client
 
         #optional, base 64 .. auto-created if not given
         key => '..',
+
+        #same format as HTTP::Headers::Util uses
+        extensions => [ .. ],
     );
 
     #Note the need to conclude the header text manually.
@@ -105,11 +108,11 @@ sub _create_header_lines {
         "Sec-WebSocket-Key: $self->{'key'}",
         'Sec-WebSocket-Version: ' . Net::WebSocket::Constants::PROTOCOL_VERSION(),
 
+        $self->_encode_extensions(),
+
         $self->_encode_subprotocols(),
 
         ( $self->{'origin'} ? "Origin: $self->{'origin'}" : () ),
-
-        #TODO: Support “extensions”
     );
 }
 

@@ -65,7 +65,9 @@ the underlying transport mechanism is up to you: it could be a file,
 a UNIX socket, ordinary TCP/IP, some funky C<tie()>d object, or whatever.
 
 Net::WebSocket also “has no opinions” about how you should do I/O or HTTP
-headers. As a result of this “bare-bones” approach, Net::WebSocket can likely
+headers. There are too many different ways to accomplish HTTP header
+management in particular for it to be sensible for a WebSocket library to
+impose any one approach. As a result of this, Net::WebSocket can likely
 fit your project; however, it won’t absolve you of the need to know some
 things about the WebSocket protocol itself. There are some examples
 of how you might write complete applications (client or server)
