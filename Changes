@@ -67,3 +67,12 @@ Revision history for Perl module Net::WebSocket
 
 - Document SERVER_ERROR anomaly re RFC erratum
 - Straighten out a bit of POD in the main distro docs
+
+0.04
+- Support extensions in handshake.
+
+- Allow get_next_message() not to throw an exception on a close frame.
+
+- Add received_close_frame() and sent_close_frame() methods.
+
+- Further documentation updates to accommodate 0.03 API changes

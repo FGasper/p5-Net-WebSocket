@@ -1,6 +1,6 @@
 package Net::WebSocket;
 
-our $VERSION = '0.031';
+our $VERSION = '0.04-TRIAL1';
 
 =encoding utf-8
 
@@ -195,6 +195,9 @@ can do in your application.
 =head1 TODO
 
 =over
+
+=item * Support the L<permessage-deflate|https://tools.ietf.org/html/rfc7692>
+extension natively.
 
 =item * Add tests, especially for extension support.
 

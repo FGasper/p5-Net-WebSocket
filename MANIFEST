@@ -5,6 +5,7 @@ MANIFEST
 Makefile.PL
 demo/123_server.pl
 demo/echo_server.pl
+demo/lib/MockReader.pm
 demo/lib/NWDemo.pm
 demo/shell_server.pl
 demo/wscat.pl
@@ -28,6 +29,7 @@ lib/Net/WebSocket/Frame/pong.pm
 lib/Net/WebSocket/Frame/text.pm
 lib/Net/WebSocket/Handshake/Base.pm
 lib/Net/WebSocket/Handshake/Client.pm
+lib/Net/WebSocket/Handshake/Extension.pm
 lib/Net/WebSocket/Handshake/Server.pm
 lib/Net/WebSocket/Mask.pm
 lib/Net/WebSocket/Masker/Client.pm
@@ -48,6 +50,7 @@ lib/Net/WebSocket/X/ReceivedBadControlFrame.pm
 lib/Net/WebSocket/X/ReceivedClose.pm
 t/create_frame.t
 t/handshake.t
+t/handshake_extension.t
 t/parse_message.t
 t/parse_message_close.t
 t/partial_frame.t
