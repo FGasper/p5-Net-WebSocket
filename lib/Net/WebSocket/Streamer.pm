@@ -73,7 +73,7 @@ sub create_chunk {
 
     my $frame = $self->{'class'}->new(
         fin => 0,
-        $self->{'class'}->FRAME_MASK_ARGS(),
+        $self->FRAME_MASK_ARGS(),
         payload_sr => \$_[0],
     );
 
@@ -91,7 +91,7 @@ sub create_final {
 
     my $frame = $self->{'class'}->new(
         fin => 1,
-        $self->{'class'}->FRAME_MASK_ARGS(),
+        $self->FRAME_MASK_ARGS(),
         payload_sr => \$_[0],
     );
 
