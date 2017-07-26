@@ -104,10 +104,11 @@ sub parameters {
     return @{ $_[0] }[ 1 .. $#{ $_[0] } ];
 }
 
-=head2 I<OBJ>->to_string()
+=head2 I<OBJ>->to_string( OTHER_EXTENSIONS )
 
-Returns a string that represents the extension as a
-C<Sec-WebSocket-Extensions> header value.
+Returns a string that represents the extension (and any others) as a
+C<Sec-WebSocket-Extensions> header value. Other extensions are to be given
+as instances of this class.
 
 =cut
 

@@ -22,8 +22,8 @@ Net::WebSocket::Handshake::Client
         #optional, base 64 .. auto-created if not given
         key => '..',
 
-        #same format as HTTP::Headers::Util uses
-        extensions => [ .. ],
+        #optional, instances of Net::WebSocket::Handshake::Extension
+        extensions => \@extension_objects,
     );
 
     #Note the need to conclude the header text manually.

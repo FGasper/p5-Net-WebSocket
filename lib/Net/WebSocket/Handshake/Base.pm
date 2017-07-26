@@ -44,6 +44,7 @@ sub _encode_extensions {
     Module::Load::load('HTTP::Headers::Util');
 
     return if !$self->{'extensions'};
+    return if !@{ $self->{'extensions'} };
 
     my ($first, @others) = @{ $self->{'extensions'} };
 

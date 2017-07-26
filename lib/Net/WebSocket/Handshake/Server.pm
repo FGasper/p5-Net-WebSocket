@@ -15,6 +15,9 @@ Net::WebSocket::Handshake::Server
 
         #optional
         subprotocols => [ 'echo', 'haha' ],
+
+        #optional, instances of Net::WebSocket::Handshake::Extension
+        extensions => \@extension_objects,
     );
 
     #Note the need to conclude the header text manually.
