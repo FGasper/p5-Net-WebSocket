@@ -101,19 +101,19 @@ sub create_final {
 }
 
 sub _load_frame_class {
-    my ($self, $type) = @_;
+    my ($class, $type) = @_;
 
-    my $class = $self->{'class'}->can("frame_class_$type");
-    if (!$class) {
+    my $frame_class = $class->can("frame_class_$type");
+    if (!$frame_class) {
         die "Unknown frame type: “$type”!";
     }
 
-    $class = $class->();
-    if (!$class->can('new')) {
-        Module::Load::load($class);
+    $frame_class = $frame_class->();
+    if (!$frame_class->can('new')) {
+        Module::Load::load($frame_class);
     }
 
-    return $class;
+    return $frame_class;
 }
 
 sub DESTROY {
