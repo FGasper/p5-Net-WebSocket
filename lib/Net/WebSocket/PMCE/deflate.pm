@@ -1,5 +1,29 @@
 package Net::WebSocket::PMCE::deflate;
 
+#----------------------------------------------------------------------
+# The original idea here was to apply DEFLATE to frames and messages
+# that are already assembled. Probably a better approach is to subclass
+# the text, binary, and continuation frame objects to apply DEFLATE
+# right away.
+#
+# The reason for this is that the RFC appears to assume that we
+# assemble frames with an awareness of the compression.
+#
+# Note in particular that (7.2.1):
+# for non-final fragments, the removal of 0x00 0x00 0xff 0xff MUST NOT be done
+#
+# In fact, the DEFLATE is apparently meant only to apply to creation of a
+# *message*. That’s potentially useful: maybe a factory?
+#
+# Need to learn more about how DEFLATE works before working more on this.
+# And/or, look at other implementations. For example, how do they handle
+# fragmentation? Something like:
+#
+# $deflate->compress(
+#
+# my $msg_iter = $deflate->start_message(
+#----------------------------------------------------------------------
+
 =encoding utf-8
 
 =head1 NAME
@@ -50,8 +74,9 @@ my @VALID_MAX_WINDOW_BITS = qw( 8 9 10 11 12 13 14 15 );
 
 use constant {
     TOKEN => 'permessage-deflate',
+
     _ZLIB_SYNC_TAIL => "\0\0\xff\xff",
-    _DEBUG => 1,
+    _DEBUG => 0,
 };
 
 =head2 validate_max_window_bits( BITS )
@@ -120,11 +145,11 @@ our $_full_flush_frame;
 #This gets called from SUPER::compress_message(), so we have to
 #make sure that there isn’t already a frame marked as the one that
 #gets a full flush.
-sub compress_frame {
-    local $_full_flush_frame = $_[1] if $_[0]{'local_no_context_takeover'} && !$_full_flush_frame;
-
-    return $_[0]->SUPER::compress_frame($_[1]);
-}
+#sub compress_frame {
+#    local $_full_flush_frame = $_[1] if $_[0]{'local_no_context_takeover'} && !$_full_flush_frame;
+#
+#    return $_[0]->SUPER::compress_frame($_[1]);
+#}
 
 sub compress_message {
     local $_full_flush_frame = ($_[0]->get_frames())[-1] if $_[0]{'local_no_context_takeover'};
@@ -146,9 +171,9 @@ sub decompress {
 
     $self->{'i'} ||= $self->_create_inflate_obj();
 
-    $_[1] .= _ZLIB_SYNC_TAIL;
-
     _debug(sprintf "inflating: %v.02x\n", $_[1]) if _DEBUG;
+
+    $_[1] .= _ZLIB_SYNC_TAIL;
 
     my $status = $self->{'i'}->inflate($_[1], my $v);
     die $status if $status != Compress::Raw::Zlib::Z_OK();

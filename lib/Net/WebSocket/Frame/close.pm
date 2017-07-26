@@ -76,6 +76,9 @@ WebSocket standard), however, Net::WebSocket only recognizes C<SERVER_ERROR>
 as an alias of 1011. Hopefully a future update to the WebSocket standard will
 include useful string aliases for the status codes.
 
+Also note that L<the official list of status codes|http://www.iana.org/assignments/websocket/websocket.xhtml#close-code-number> contains some that
+don’t have string constants.
+
 =back
 
 =cut

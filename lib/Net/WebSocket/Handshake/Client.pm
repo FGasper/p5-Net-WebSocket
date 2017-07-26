@@ -123,7 +123,6 @@ sub validate_accept_or_die {
 
     return if $received eq $should_be;
 
-    #TODO
     die Net::WebSocket::X->create('BadAccept', $should_be, $received );
 }
 

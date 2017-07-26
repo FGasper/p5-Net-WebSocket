@@ -29,7 +29,6 @@ use Net::WebSocket::Handshake::Server ();
 use Net::WebSocket::Parser ();
 
 use Net::WebSocket::Handshake::Extension ();
-use Net::WebSocket::PMCE::deflate::Server ();
 
 my $host_port = $ARGV[0] || die "Need host:port or port!\n";
 
@@ -60,8 +59,6 @@ while ( my $sock = $server->accept() ) {
 
     my @exts;
 
-    my $deflate;
-
     NWDemo::handshake_as_server(
         $sock,
         sub {
@@ -76,81 +73,12 @@ while ( my $sock = $server->accept() ) {
             #now it’s a list of objects
             @extensions = map { Net::WebSocket::Handshake::Extension->parse_string($_) } @extensions;
 
-            my $trial_deflate = Net::WebSocket::PMCE::deflate::Server->new();
-
-            my @headers;
-
-            try {
-                my $ext = $trial_deflate->consume_offer_header_parts(@extensions);
-
-                $deflate = $trial_deflate;
-warn $ext->to_string();
-                push @headers, 'Sec-WebSocket-Extensions: ' . $ext->to_string();
+            for my $ext (@extensions) {
+                my @params = $ext->parameters();
+                printf "Requested extension: %s\n", $ext->to_string();
             }
-            catch {
-warn $_;
-                my $msg = try { $_->get_message() } || $_;
 
-                #only one line
-                $msg =~ s<[\r\n]+.*><>;
-
-                push @headers, "X-Sec-WebSocket-Extensions-Error: $msg";
-            };
-
-#
-#          EXTENSION:
-#            for my $ext (map { HTTP::Headers::Util::split_header_words($_) } @extensions) {
-#                if ($ext->[0] eq 'permessage-deflate') {
-#                    my $server_max_bits;
-#                    my $client_max_bits;
-#
-#                    my %opts = @{$ext}[ 2 .. $#$ext ];
-#                    if (exists $opts{'server_max_window_bits'}) {
-#                        my $err;
-#                        try {
-#                            Net::WebSocket::PMCE::deflate::validate_max_window_bits($opts{'server_max_window_bits'});
-#                            $server_max_bits = $opts{'server_max_window_bits'};
-#                        }
-#                        catch {
-#                            push @headers, "X-Sec-WebSocket-Extensions-Error: server_max_window_bits - " . $_->get_message();
-#                        };
-#
-#                        next EXTENSION if !$server_max_bits;
-#                    }
-#
-#                    if (exists $opts{'client_max_window_bits'}) {
-#                        my $err;
-#                        if (defined $opts{'client_max_window_bits'}) {
-#                            try {
-#                                    Net::WebSocket::PMCE::deflate::validate_max_window_bits($opts{'client_max_window_bits'});
-#                                    $client_max_bits = $opts{'client_max_window_bits'};
-#                                }
-#                            }
-#                            catch {
-#                                push @headers, "X-Sec-WebSocket-Extensions-Error: client_max_window_bits - " . $_->get_message();
-#                            };
-#
-#                            next EXTENSION if !$client_max_bits;
-#                        }
-#                    }
-#
-#                    if ($opts{'server_no_context_takeover'}) {
-#                        push @headers, "X-Sec-WebSocket-Extensions-Error: unsupported - server_no_context_takeover";
-#                        next EXTENSION;
-#                    }
-#
-#                    push @headers, 'Sec-WebSocket-Extensions: permessage-deflate';
-#                    $deflate = Net::WebSocket::PMCE::deflate->new(
-#                        deflate_max_window_bits => $server_max_bits,
-#                        inflate_max_window_bits => $client_max_bits,
-#                    );
-#                }
-#                else {
-#                    push @headers, 'X-Sec-WebSocket-Extensions-Error: unsupported - ' . HTTP::Headers::Util::join_header_words( @$ext );
-#                }
-#            }
-
-            return @headers;
+            return;
         },
     );
 
@@ -170,32 +98,9 @@ warn $_;
     my $ept = Net::WebSocket::Endpoint::Server->new(
         parser => $parser,
         out => $framed_obj,
-
-        on_data_frame => sub {
-            my ($frame) = @_;
-
-            my $payload;
-            if ($deflate && $deflate->frame_is_compressed($frame)) {
-                $payload = $deflate->decompress($frame->get_payload());
-            }
-            else {
-                $payload = $frame->get_payload();
-            }
-
-            my $answer = 'Net::WebSocket::Frame::' . $frame->get_type();
-            $answer = $answer->new(
-                fin => $frame->get_fin(),
-                rsv => $frame->get_rsv(),
-                payload_sr => \$payload,
-            );
-
-            if ($deflate) {
-                $deflate->compress_frame($answer);
-            }
-
-            $framed_obj->write( $answer->to_bytes() );
-        },
     );
+
+    $ept->do_not_die_on_close();
 
     my $write_select = IO::Select->new($sock);
 
@@ -207,7 +112,7 @@ warn $_;
         #IO::Select leaves ENOENT in $!, even on success
         #warn "select(): $!" if $!;
 
-        if ($wtrs_ar && @$wtrs_ar) {
+        if ($cur_write_s && $wtrs_ar && @$wtrs_ar) {
             $framed_obj->flush_write_queue();
         }
 
@@ -223,17 +128,26 @@ warn $_;
         }
 
         if ( @$rdrs_ar ) {
-            try {
-                $ept->get_next_message();
+            my $msg = $ept->get_next_message();
+
+            #If this returns falsey, whether we get undef or q<>
+            #we react the same way.
+            if ( $msg ) {
+                my $payload = $msg->get_payload();
+
+                my $answer_f = 'Net::WebSocket::Frame::' . $msg->get_type();
+                $answer_f = $answer_f->new(
+                    payload_sr => \$payload,
+                );
+
+                my $answer = Net::WebSocket::Message::create_from_frames($answer_f);
+
+                $framed_obj->write( $answer->to_bytes() );
             }
-            catch {
-                if (!try { $_->isa('Net::WebSocket::X::ReceivedClose') } ) {
-                    local $@ = $_;
-                    die;
-                }
-            };
         }
     }
+
+    print "Done: PID $$\n";
 
     exit;
 }
