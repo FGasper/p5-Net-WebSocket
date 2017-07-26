@@ -161,9 +161,13 @@ Recall that in some languages—like JavaScript!—the difference between
 =head2 Use of L<IO::Framed>
 
 CPAN’s L<IO::Framed> provides a straightforward interface for chunking up
-data from byte streams into frames. You don’t have to use it (which is why
-it’s not listed as a requirement), but you’ll need to provide an equivalent
-interface if you don’t.
+data from byte streams into frames. It also provides a write buffer for
+non-blocking writes, and it retries on EINTR. You don’t have to use it
+(which is why it’s not listed as a requirement), but you’ll need to provide
+a compatible interface if you don’t.
+
+See the demo scripts that use L<IO::Framed> for an example of when you may
+need a different solution here.
 
 =head1 EXTENSION SUPPORT
 
