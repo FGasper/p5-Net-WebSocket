@@ -46,8 +46,11 @@ lib/Net/WebSocket/X.pm
 lib/Net/WebSocket/X/BadAccept.pm
 lib/Net/WebSocket/X/BadArg.pm
 lib/Net/WebSocket/X/Base.pm
+lib/Net/WebSocket/X/ControlPayloadTooLong.pm
+lib/Net/WebSocket/X/EndpointAlreadyClosed.pm
 lib/Net/WebSocket/X/ReceivedBadControlFrame.pm
 lib/Net/WebSocket/X/ReceivedClose.pm
+lib/Net/WebSocket/X/UnfinishedStream.pm
 t/create_frame.t
 t/handshake.t
 t/handshake_extension.t
