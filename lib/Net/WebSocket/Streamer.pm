@@ -49,6 +49,7 @@ use strict;
 use warnings;
 
 use Net::WebSocket::Frame::continuation ();
+use Net::WebSocket::X ();
 
 use constant {
 
@@ -64,15 +65,13 @@ sub new {
 
     my $frame_class = $class->_load_frame_class($type);
 
-    #Store the frame class as the value of $$self.
-
-    return bless \$frame_class, $class;
+    return bless { class => $frame_class, pid => $$ }, $class;
 }
 
 sub create_chunk {
     my $self = shift;
 
-    my $frame = $$self->new(
+    my $frame = $self->{'class'}->new(
         fin => 0,
         $self->FRAME_MASK_ARGS(),
         payload_sr => \$_[0],
@@ -80,8 +79,8 @@ sub create_chunk {
 
     #The first $frame we create needs to be text/binary, but all
     #subsequent ones must be continuation.
-    if ($$self ne 'Net::WebSocket::Frame::continuation') {
-        $$self = 'Net::WebSocket::Frame::continuation';
+    if ($self->{'class'} ne 'Net::WebSocket::Frame::continuation') {
+        $self->{'class'} = 'Net::WebSocket::Frame::continuation';
     }
 
     return $frame;
@@ -90,38 +89,38 @@ sub create_chunk {
 sub create_final {
     my $self = shift;
 
-    my $frame = $$self->new(
+    my $frame = $self->{'class'}->new(
         fin => 1,
         $self->FRAME_MASK_ARGS(),
         payload_sr => \$_[0],
     );
 
-    substr( $$self, 0 ) = FINISHED_INDICATOR();
+    $self->{'finished'} = 1;
 
     return $frame;
 }
 
 sub _load_frame_class {
-    my ($self, $type) = @_;
+    my ($class, $type) = @_;
 
-    my $class = $self->can("frame_class_$type");
-    if (!$class) {
+    my $frame_class = $class->can("frame_class_$type");
+    if (!$frame_class) {
         die "Unknown frame type: “$type”!";
     }
 
-    $class = $class->();
-    if (!$class->can('new')) {
-        Module::Load::load($class);
+    $frame_class = $frame_class->();
+    if (!$frame_class->can('new')) {
+        Module::Load::load($frame_class);
     }
 
-    return $class;
+    return $frame_class;
 }
 
 sub DESTROY {
     my ($self) = @_;
 
-    if (!$$self eq FINISHED_INDICATOR()) {
-        die sprintf("$self DESTROYed without having sent a final fragment!");
+    if (($self->{'pid'} == $$) && !$self->{'finished'}) {
+        die Net::WebSocket::X->create('UnfinishedStream', $self);
     }
 
     return;

@@ -76,3 +76,5 @@ Revision history for Perl module Net::WebSocket
 - Add received_close_frame() and sent_close_frame() methods.
 
 - Further documentation updates to accommodate 0.03 API changes
+
+- Replace more plain exceptions with objects
