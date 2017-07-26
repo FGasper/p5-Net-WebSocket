@@ -32,7 +32,7 @@ Net::WebSocket::Frame::close
     my $serialized = $frm->to_bytes();
 
 Note that, L<as per RFC 6455|https://tools.ietf.org/html/rfc6455#section-5.5>,
-close messages can either have:
+close messages can have any of:
 
 =over
 
@@ -108,12 +108,12 @@ sub new {
                 $num = $opts{'code'};
 
                 if ($num !~ m<\A[0-9]{4}\z> ) {
-                    die "Invalid WebSocket status code: [$num]";
+                    die Net::WebSocket::X->create('BadArg', 'code', $num, 'Invalid WebSocket status code');
                 }
 
                 if ( !Net::WebSocket::Constants::status_code_to_name($num) ) {
                     if ( $num < 4000 || $num > 4999 ) {
-                        die "Disallowed WebSocket status code: [$num]";
+                        die Net::WebSocket::X->create('BadArg', 'code', $num, 'Disallowed WebSocket status code');
                     }
                 }
             }
@@ -122,7 +122,7 @@ sub new {
 
             if (defined $opts{'reason'}) {
                 if (length $opts{'reason'} > 123) {
-                    die "“reason” ($opts{'reason'}) cannot exceed 123 bytes!";
+                    die Net::WebSocket::X->create('BadArg', 'reason', $opts{'reason'}, 'Reason cannot exceed 123 bytes!');
                 }
 
                 $payload .= $opts{'reason'};
@@ -143,6 +143,7 @@ sub get_code_and_reason {
 
     Call::Context::must_be_list();
 
+    #This shouldn’t happen … maybe leftover from previous architecture?
     if ($self->get_type() ne 'close') {
         my $type = $self->get_type();
         die "Frame type is “$type”, not “close” as expected!";
