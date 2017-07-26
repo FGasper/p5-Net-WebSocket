@@ -246,7 +246,7 @@ sub _got_non_continuation_during_fragment {
 sub _verify_not_closed {
     my ($self) = @_;
 
-    die "Already closed!" if $self->{'_sent_close_frame'};
+    die Net::WebSocket::X->create('EndpointAlreadyClosed') if $self->{'_closed'};
 
     return;
 }
