@@ -62,7 +62,7 @@ for my $t (@tests) {
         syswrite $wtr, substr( $bytes, 0, 1, q<> );
         my ($rdrs_ar, undef, $excs_ar) = IO::Select->select( $ios, undef, $ios );
 
-        if (@$excs_ar) {
+        if ($excs_ar && @$excs_ar) {
             warn "select() indicated an error??";
             last;
         }
