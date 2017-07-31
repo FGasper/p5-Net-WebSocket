@@ -4,13 +4,14 @@ package Net::WebSocket::Streamer;
 
 =head1 NAME
 
-Net::WebSocket::Streamer - Send a stream easily over WebSocket
+Net::WebSocket::Streamer - Stream a WebSocket message easily
 
 =head1 SYNOPSIS
 
 Here’s the gist of it:
 
-    my $streamer = Net::WebSocket::Streamer->new('binary');
+    #Use the ::Client or ::Server subclass as needed.
+    my $streamer = Net::WebSocket::Streamer::Client->new('binary');
 
     my $frame = $streamer->create_chunk($buf);
 
@@ -36,6 +37,11 @@ of arbitrary size in 64-KiB chunks:
 
 You can, of course, create/send an empty final frame for cases where you’re
 not sure how much data will actually be sent.
+
+Note that the receiving application won’t necessarily have access to the
+individual message fragments (i.e., frames) that you send. Web browsers,
+for example, only expose messages, not frames. You may thus be better off
+sending full messages rather than frames.
 
 =head1 EXTENSION SUPPORT
 
@@ -77,8 +83,8 @@ sub create_chunk {
         payload_sr => \$_[0],
     );
 
-    #The first $frame we create needs to be text/binary, but all
-    #subsequent ones must be continuation.
+    #The first $frame we create needs to be typed (e.g., text or binary),
+    #but all subsequent ones must be continuation.
     if ($self->{'class'} ne 'Net::WebSocket::Frame::continuation') {
         $self->{'class'} = 'Net::WebSocket::Frame::continuation';
     }
@@ -90,8 +96,8 @@ sub create_final {
     my $self = shift;
 
     my $frame = $self->{'class'}->new(
-        fin => 1,
         $self->FRAME_MASK_ARGS(),
+        fin => 1,
         payload_sr => \$_[0],
     );
 
