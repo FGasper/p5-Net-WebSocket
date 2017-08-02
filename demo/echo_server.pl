@@ -140,7 +140,7 @@ while ( my $sock = $server->accept() ) {
                     payload_sr => \$payload,
                 );
 
-                my $answer = Net::WebSocket::Message::create_from_frames($answer_f);
+                my $answer = Net::WebSocket::Message->create_from_frames($answer_f);
 
                 $framed_obj->write( $answer->to_bytes() );
             }

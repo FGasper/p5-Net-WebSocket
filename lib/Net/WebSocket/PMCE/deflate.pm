@@ -6,9 +6,14 @@ package Net::WebSocket::PMCE::deflate;
 #
 # So, we have two workflows:
 #
-#   1) compress_message
+#   1) Take a message payload and construct a compressed message.
 #
-#   2) deflate::Streamer - 
+#   2) Take a message fragment and build a frame for it, distinguishing
+#      between final and non-final fragments.
+#
+# For #2 we should *always* preserve a sliding window until the final
+# fragment, as the spec mandates assembly of the entire message payload
+# prior to decompression.
 #
 #----------------------------------------------------------------------
 # The original idea here was to apply DEFLATE to frames and messages
@@ -220,9 +225,8 @@ sub _consume_header_parts {
 
 #----------------------------------------------------------------------
 
-my $payload_sr;
+my $_payload_sr;
 
-#Used by the parent class.
 #cf. RFC 7692, 7.2.1
 sub compress_payload {
     my ($self) = @_;
@@ -231,9 +235,9 @@ sub compress_payload {
 
     $self->{'d'} ||= $self->_create_deflate_obj();
 
-    _debug(sprintf "to deflate: [%v.02x]", $$payload_sr) if _DEBUG;
+    _debug(sprintf "to deflate: [%v.02x]", $$_payload_sr) if _DEBUG;
 
-    my $dstatus = $self->{'d'}->deflate( $$payload_sr, my $out );
+    my $dstatus = $self->{'d'}->deflate( $$_payload_sr, my $out );
     die "deflate: $dstatus" if $dstatus != Compress::Raw::Zlib::Z_OK();
 
     _debug(sprintf "post-deflate output: [%v.02x]", $out) if _DEBUG;

@@ -26,8 +26,9 @@ This is a base class for Per-Message Compression Extension modules, as
 defined in L<RFC 7692|https://tools.ietf.org/html/rfc7692>.
 
 If you’re looking for an implementation of the C<permessage-deflate>
-extension, look at L<Net::WebSocket::PMCE::deflate>. C<permessage-deflate>
-is a specific B<example> of a PMCE; as of this writing it’s the only
+extension, look at L<Net::WebSocket::PMCE::deflate>. Note that
+C<permessage-deflate> is a specific B<example> of a PMCE;
+as of this writing it’s also the only
 one that seems to enjoy widespread use.
 
 =head1 STATUS
