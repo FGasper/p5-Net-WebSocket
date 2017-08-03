@@ -39,17 +39,18 @@ my @frames2 = (
 my $msg2 = Net::WebSocket::Message::create_from_frames(@frames2);
 
 TODO: {
-    local $TODO = 'apparent bug in Compress::Raw::Zlib: appends extra empty/uncompressed block';
+    local $TODO = 'apparent bug in Compress::Raw::Zlib (https://rt.cpan.org/Ticket/Display.html?id=122695)';
 
     is(
         $msg2->get_payload(),
         $msg->get_payload(),
-        'with “local_no_context_takeover” two identical successive messages are the same',
+        'with “local_no_context_takeover” two identical successive messages compress the same (i.e., context is reset)',
     ) or do {
         diag( sprintf "%v.02x\n", $_ ) for map { $_->get_payload() } @frames, @frames2;
     };
 }
 
+#This is here because the former is broken.
 is(
     sprintf( '%v.02x', substr( $frames[0]->get_payload(), 0, length $frames2[0]->get_payload() ) ),
     sprintf( '%v.02x', $frames2[0]->get_payload() ),
