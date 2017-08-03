@@ -44,6 +44,7 @@ WriteMakefile1(
         'File::Slurp' => 0,
         'IO::Framed' => 0,
         'IO::Select' => 0,
+        ( $^O eq 'MSWin32' ? ('Win32::Socketpair' => 0.02) : () ),
     },
 );
 
