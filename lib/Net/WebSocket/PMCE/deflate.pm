@@ -1,8 +1,15 @@
 package Net::WebSocket::PMCE::deflate;
 
 #----------------------------------------------------------------------
-# This works only at the level of the *message*. Fragmentation is expected
-# to happen within the confines of the PMCE.
+# PMCEs work only at the level of the *message*. (6.1 & 6.2) Fragmentation
+# happens within the confines of the PMCE; however, permessage-deflate
+# also describes:
+#
+#   Even when only part of the payload is available, a fragment can be
+#   built by compressing the available data and choosing the block type
+#   appropriately so that the end of the resulting compressed data is
+#   aligned at a byte boundary.  Note that for non-final fragments, the
+#   removal of 0x00 0x00 0xff 0xff MUST NOT be done. (7.2.1)
 #
 # So, we have two workflows:
 #
@@ -61,8 +68,8 @@ Net::WebSocket::PMCE::deflate - WebSocket’s C<permessage-deflate> extension
 This class implements C<permessage-deflate> as defined in
 L<RFC 7692|https://tools.ietf.org/html/rfc7692>.
 
-If you’re looking for an implementation of C<permessage-deflate>,
-look at L<Net::WebSocket::PMCE::deflate>.
+If you want a base class to use to implement other per-message compress
+extensions (PMCEs), look at L<Net::WebSocket::PMCE>.
 
 =head1 STATUS
 
@@ -80,6 +87,7 @@ use warnings;
 use parent 'Net::WebSocket::PMCE';
 
 use Call::Context ();
+use Module::Load ();
 
 use Net::WebSocket::X ();
 
@@ -155,21 +163,8 @@ sub new {
     return bless \%opts, $class;
 }
 
-our $_full_flush_frame;
-
-#This gets called from SUPER::compress_message(), so we have to
-#make sure that there isn’t already a frame marked as the one that
-#gets a full flush.
-#sub compress_frame {
-#    local $_full_flush_frame = $_[1] if $_[0]{'local_no_context_takeover'} && !$_full_flush_frame;
-#
-#    return $_[0]->SUPER::compress_frame($_[1]);
-#}
-
-sub compress_message {
-    local $_full_flush_frame = ($_[0]->get_frames())[-1] if $_[0]{'local_no_context_takeover'};
-
-    return $_[0]->SUPER::compress_message($_[1]);
+sub local_no_context_takeover {
+    return $_[0]{'local_no_context_takeover'};
 }
 
 =head2 $decompressed = I<OBJ>->decompress( COMPRESSED_PAYLOAD )
@@ -228,27 +223,52 @@ sub _consume_header_parts {
 my $_payload_sr;
 
 #cf. RFC 7692, 7.2.1
-sub compress_payload {
+sub compress_sync_flush {
+    _load_zlib_if_needed();
+
+    return $_[0]->_compress( $_[1], Compress::Raw::Zlib::Z_SYNC_FLUSH() );
+}
+
+sub compress_sync_flush_chomp {
+    _load_zlib_if_needed();
+
+    return _chomp_0000ffff_or_die( $_[0]->_compress( $_[1], Compress::Raw::Zlib::Z_SYNC_FLUSH() ) );
+}
+
+sub compress_full_flush_chomp {
+    _load_zlib_if_needed();
+
+    return _chomp_0000ffff_or_die( $_[0]->_compress( $_[1], Compress::Raw::Zlib::Z_FULL_FLUSH() ) );
+}
+
+sub _chomp_0000ffff_or_die {
+    if ( substr($_[0], -4) eq _ZLIB_SYNC_TAIL ) {
+        substr($_[0], -4) = q<>;
+    }
+    else {
+        die sprintf('deflate/flush didn’t end with expected SYNC tail (00.00.ff.ff): %v.02x', $_[0]);
+    }
+
+    return $_[0];
+}
+
+sub _compress {
     my ($self) = @_;
 
-    $payload_sr = \$_[1];
+    $_payload_sr = \$_[1];
 
     $self->{'d'} ||= $self->_create_deflate_obj();
 
     _debug(sprintf "to deflate: [%v.02x]", $$_payload_sr) if _DEBUG;
 
-    my $dstatus = $self->{'d'}->deflate( $$_payload_sr, my $out );
+    my $out;
+
+    my $dstatus = $self->{'d'}->deflate( $$_payload_sr, $out );
     die "deflate: $dstatus" if $dstatus != Compress::Raw::Zlib::Z_OK();
 
     _debug(sprintf "post-deflate output: [%v.02x]", $out) if _DEBUG;
 
-    if ( $_full_flush_frame && $_full_flush_frame eq $frame ) {
-        $dstatus = $self->{'d'}->flush($out, Compress::Raw::Zlib::Z_FULL_FLUSH());
-    }
-    else {
-        $dstatus = $self->{'d'}->flush($out, Compress::Raw::Zlib::Z_SYNC_FLUSH());
-    }
-
+    $dstatus = $self->{'d'}->flush($out, $_[2]);
     die "deflate flush: $dstatus" if $dstatus != Compress::Raw::Zlib::Z_OK();
 
     _debug(sprintf "post-flush output: [%v.02x]", $out) if _DEBUG;
@@ -265,14 +285,14 @@ sub compress_payload {
     #> perl -MCompress::Raw::Zlib -e' my $deflate = Compress::Raw::Zlib::Deflate->new( -WindowBits => -8, -AppendOutput => 1, -Level => Compress::Raw::Zlib::Z_NO_COMPRESSION ); $deflate->deflate( "", my $out ); $deflate->flush( $out, Compress::Raw::Zlib::Z_SYNC_FLUSH()); print $out' | xxd
     #00000000: 0000 00ff ff                             .....
 
-    if ( substr($out, -4) eq _ZLIB_SYNC_TAIL ) {
-        substr($out, -4) = q<>;
-    }
-    else {
-        die sprintf('deflate/flush didn’t end with expected SYNC tail (00.00.ff.ff): %v.02x', $out);
-    }
-
-    #$frame->set_payload_sr( \$out );
+#    if ( $_[2] == Compress::Raw::Zlib::Z_FULL_FLUSH() ) {
+#        if ( substr($out, -4) eq _ZLIB_SYNC_TAIL ) {
+#            substr($out, -4) = q<>;
+#        }
+#        else {
+#            die sprintf('deflate/flush didn’t end with expected SYNC tail (00.00.ff.ff): %v.02x', $out);
+#        }
+#    }
 
     return $out;
 }
@@ -291,8 +311,6 @@ sub _load_zlib_if_needed {
 sub _create_inflate_obj {
     my ($self) = @_;
 
-    _load_zlib_if_needed();
-
     my $window_bits = $self->{'inflate_max_window_bits'} || $VALID_MAX_WINDOW_BITS[-1];
 
     my ($inflate, $istatus) = Compress::Raw::Zlib::Inflate->new(
@@ -306,8 +324,6 @@ sub _create_inflate_obj {
 
 sub _create_deflate_obj {
     my ($self) = @_;
-
-    _load_zlib_if_needed();
 
     my $window_bits = $self->{'deflate_max_window_bits'} || $VALID_MAX_WINDOW_BITS[-1];
 

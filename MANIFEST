@@ -58,5 +58,7 @@ t/parse_message.t
 t/parse_message_close.t
 t/partial_frame.t
 t/partial_huge_frame.t
+t/permessage_deflate_streamer.t
+t/permessage_deflate_streamer__no_context_takeover.t
 t/round_trip.t
 t/single_close.t

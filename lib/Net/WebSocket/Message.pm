@@ -7,7 +7,7 @@ use Call::Context ();
 
 sub new {
     if (!$_[1]->isa('Net::WebSocket::Frame')) {
-        die( (caller 0)[3] ' needs at least one Net::WebSocket::Frame object!' );
+        die( (caller 0)[3] . ' needs at least one Net::WebSocket::Frame object!' );
     }
 
     return bless \@_, shift;

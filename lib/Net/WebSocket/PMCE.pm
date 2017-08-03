@@ -76,25 +76,25 @@ sub message_is_compressed {
     return ($_[1]->get_frames())[0]->has_rsv1();
 }
 
-=head2 I<OBJ>->create_message( MESSAGE_CLASS, OCTET_STRING )
-
-Modifies the given OCTET_STRING to be compressed.
-
-Returns the OBJ (B<not> the OCTET_STRING). This facilitates the
-“chaining” pattern.
-
-=cut
-
-sub compress_payload {
-    my ($self, $msg) = @_;
-
-    my @frames = $msg->get_frames();
-    $self->_compress_payload($_) for @frames;
-
-    $frames[0]->set_rsv1();
-
-    return $self;
-}
+#=head2 I<OBJ>->create_message( MESSAGE_CLASS, OCTET_STRING )
+#
+#Modifies the given OCTET_STRING to be compressed.
+#
+#Returns the OBJ (B<not> the OCTET_STRING). This facilitates the
+#“chaining” pattern.
+#
+#=cut
+#
+#sub compress_payload {
+#    my ($self, $msg) = @_;
+#
+#    my @frames = $msg->get_frames();
+#    $self->_compress_payload($_) for @frames;
+#
+#    $frames[0]->set_rsv1();
+#
+#    return $self;
+#}
 
 =head1 REPOSITORY
 
