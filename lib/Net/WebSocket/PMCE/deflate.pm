@@ -89,6 +89,7 @@ use parent 'Net::WebSocket::PMCE';
 use Call::Context ();
 use Module::Load ();
 
+use Net::WebSocket::Handshake::Extension ();
 use Net::WebSocket::X ();
 
 my $zlib_is_loaded;
@@ -134,6 +135,8 @@ Returns a new instance of this class.
 
 C<%OPTS> is:
 
+WAS:
+
 =over
 
 =item C<deflate_max_window_bits> - optional; the number of window bits to use
@@ -159,6 +162,10 @@ C<compress_message()> when this flag is active.)
 
 sub new {
     my ($class, %opts) = @_;
+
+    $opts{'deflate_max_window_bits'} = delete $opts{ $class->_DEFLATE_MAX_WINDOW_BITS_PARAM() };
+    $opts{'inflate_max_window_bits'} = delete $opts{ $class->_INFLATE_MAX_WINDOW_BITS_PARAM() };
+    $opts{'local_no_context_takeover'} = delete $opts{ $class->_LOCAL_NO_CONTEXT_TAKEOVER_PARAM() };
 
     return bless \%opts, $class;
 }
@@ -193,6 +200,34 @@ sub decompress {
     return $v;
 }
 
+sub get_handshake_object {
+    my ($self) = @_;
+
+    return Net::WebSocket::Handshake::Extension->new(
+        $self->TOKEN(),
+
+        ( $self->{'peer_no_context_takeover'}
+            ? ( $self->_PEER_NO_CONTEXT_TAKEOVER_PARAM() => undef )
+            : ()
+        ),
+
+        ( $self->{'local_no_context_takeover'}
+            ? ( $self->_LOCAL_NO_CONTEXT_TAKEOVER_PARAM() => undef )
+            : ()
+        ),
+
+        ( $self->{'deflate_max_window_bits'}
+            ? ( $self->_DEFLATE_MAX_WINDOW_BITS_PARAM() => $self->{'deflate_max_window_bits'} )
+            : ()
+        ),
+
+        ( $self->{'inflate_max_window_bits'}
+            ? ( $self->_INFLATE_MAX_WINDOW_BITS_PARAM() => $self->{'inflate_max_window_bits'} )
+            : ()
+        ),
+    );
+}
+
 #----------------------------------------------------------------------
 
 #Used by subclasses
@@ -207,15 +242,15 @@ sub _consume_header_parts {
 
         my %opts = @{$ext_ar}[ 1 .. $#$ext_ar ];
 
-        $foreach_cr->(\%opts);
+        return ( TOKEN() => undef, $foreach_cr->(\%opts) );
 
-        if (%opts) {
-            my @list = %opts;
-            warn "Unrecognized: @list";
-        }
+#        if (%opts) {
+#            my @list = %opts;
+#            warn "Unrecognized: @list";
+#        }
     }
 
-    return $use_ext;
+    return;
 }
 
 #----------------------------------------------------------------------
@@ -340,6 +375,90 @@ sub _debug {
     print STDERR "$_[0]$/";
 }
 
+#----------------------------------------------------------------------
+
+# 7. .. A server MUST decline an extension negotiation offer for this
+# extension if any of the following conditions are met:
+sub get_received_parameter_errors {
+    my ($class, @params_kv) = @_;
+
+    my %params;
+
+    my @errors;
+
+    while ( my ($k, $v) = splice( @params_kv, 0, 2 ) ) {
+
+        #The negotiation (offer/response) contains multiple extension
+        #parameters with the same name.
+        if ( exists $params{$k} ) {
+            if (defined $v) {
+                push @errors, "Duplicate parameter /$k/ ($v)";
+            }
+            else {
+                push @errors, "Duplicate parameter /$k/, no value";
+            }
+        }
+
+        #The negotiation (offer/response) contains an extension parameter
+        #with an invalid value.
+        if ( my $cr = $class->can("_validate_$k") ) {
+            push @errors, $cr->($class, $v);
+        }
+
+        #The negotiation (offer/response) contains an extension parameter
+        #not defined for use in an (offer/response).
+        else {
+            if (defined $v) {
+                push @errors, "Unknown parameter /$k/ ($v)";
+            }
+            else {
+                push @errors, "Unknown parameter /$k/, no value";
+            }
+        }
+    }
+
+    return @errors;
+}
+
+sub _validate_client_no_context_takeover {
+    return __validate_no_context_takeover('client', $_[1]);
+}
+
+sub _validate_server_no_context_takeover {
+    return __validate_no_context_takeover('server', $_[1]);
+}
+
+sub _validate_client_max_window_bits {
+    return __validate_max_window_bits( 'client', $_[1] );
+}
+
+sub _validate_server_max_window_bits {
+    return __validate_max_window_bits( 'server', $_[1] );
+}
+
+sub __validate_no_context_takeover {
+    if (defined $_[1]) {
+        return "/$_[0]_no_context_takeover/ must not have a value.";
+    }
+
+    return;
+}
+
+sub __validate_max_window_bits {
+    my ($ept, $bits) = @_;
+
+    if (defined $bits) {
+        return if grep { $_ eq $bits } @VALID_MAX_WINDOW_BITS;
+    }
+    else {
+        return "/${ept}_max_window_bits/ must have a value.";
+    }
+
+    return "Invalid value for /${ept}_max_window_bits/ ($bits)";
+}
+
+#----------------------------------------------------------------------
+
 1;
 
 =head1 REPOSITORY
@@ -378,7 +497,7 @@ client_no_context_takeover
     - if server sends, client MUST observe/support
 
 server_max_window_bits = [8 .. 15]
-    - “Don’t you use more bits than N for sliding window size, Mr. Server!”
+    - “Don’t you use more than N bits for sliding window size, Mr. Server!”
     - “I swear I will not use more than N bits.”
     - (15 is the max/default anyway)
     - server responds with <= value

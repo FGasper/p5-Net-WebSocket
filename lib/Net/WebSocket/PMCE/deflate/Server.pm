@@ -5,9 +5,47 @@ use warnings;
 
 use parent qw( Net::WebSocket::PMCE::deflate );
 
+use constant {
+    _LOCAL_NO_CONTEXT_TAKEOVER_PARAM => 'server_no_context_takeover',
+    _DEFLATE_MAX_WINDOW_BITS_PARAM => 'server_max_window_bits',
+    _INFLATE_MAX_WINDOW_BITS_PARAM => 'client_max_window_bits',
+};
+
 use Net::WebSocket::Handshake::Extension ();
 
-=head2 my $ext = I<OBJ>->consume_offer_header_parts( EXTENSIONS )
+#----------------------------------------------------------------------
+
+=head2 I<CLASS>->new( %OPTS )
+
+Returns a new instance of this class.
+
+C<%OPTS> recognizes the C<server_max_window_bits>,
+C<client_max_window_bits>, and C<server_no_context_takeover> parameters
+from the WebSocket handshake. The same values that are valid from that
+handshake are valid here. It is assumed that you’ve validated these
+already.
+
+=cut
+
+sub new {
+    my ($class, %opts) = @_;
+
+    if (!defined $opts{'client_max_window_bits'}) {
+        delete $opts{'client_max_window_bits'};
+    }
+
+    return $class->SUPER::new(%opts);
+}
+
+sub _validate_client_max_window_bits {
+    return if !defined $_[1];
+    return $_[0]->SUPER::_validate_client_max_window_bits($_[1]);
+}
+
+
+=head2 my $ext = I<OBJ>->consume_offer_extensions( EXTENSIONS )
+
+NONONO
 
 EXTENSIONS is a list of L<Net::WebSocket::Handshake::Extension>
 instances, a parse of the C<Sec-WebSocket-Extensions> header(s) from
@@ -20,42 +58,46 @@ into the response’s C<Sec-WebSocket-Extensions> header.
 
 =cut
 
-sub consume_offer_header_parts {
-    my ($self, @extensions) = @_;
+sub consume_offer_extensions {
+    my ($class, @extensions) = @_;
 
-    my @headers;
-
-    my $use_ext = $self->_consume_header_parts(
+    return $class->_consume_header_parts(
         \@extensions,
         sub {
             my $opts_hr = shift;
 
+            my @return_opts;
+
             if (exists $opts_hr->{'server_max_window_bits'}) {
                 #TODO: validate_max_window_bits()
 
-                #Client mandates this for us.
-                #If we didn’t limit our deflate window before,
-                #or if the window was bigger than what the client
-                #wants, then take the client’s value.
-                if (!$self->{'deflate_max_window_bits'} || ($self->{'deflate_max_window_bits'} > $opts_hr->{'server_max_window_bits'})) {
-                    $self->{'deflate_max_window_bits'} = delete $opts_hr->{'server_max_window_bits'};
-                }
+                push @return_opts, (
+                    local_max_window_bits => $opts_hr->{'server_max_window_bits'},
+                );
 
-                delete $opts_hr->{'server_max_window_bits'};
+#                #Client mandates this for us.
+#                #If we didn’t limit our deflate window before,
+#                #or if the window was bigger than what the client
+#                #wants, then take the client’s value.
+#                if (!$self->{'deflate_max_window_bits'} || ($self->{'deflate_max_window_bits'} > $opts_hr->{'server_max_window_bits'})) {
+#                    $self->{'deflate_max_window_bits'} = delete $opts_hr->{'server_max_window_bits'};
+#                }
+#
+#                delete $opts_hr->{'server_max_window_bits'};
             }
 
             if (exists $opts_hr->{'client_max_window_bits'}) {
                 #TODO: validate_max_window_bits()
 
-                #Client allows us this optimization.
-                #If we didn’t limit our inflate window before,
-                #or if the window was bigger than what the client
-                #is actually compressing with, then take the client’s value.
-                if (!$self->{'inflate_max_window_bits'} || ($self->{'inflate_max_window_bits'} > $opts_hr->{'client_max_window_bits'})) {
-                    $self->{'inflate_max_window_bits'} = delete $opts_hr->{'client_max_window_bits'};
-                }
-
-                delete $opts_hr->{'client_max_window_bits'};
+#                #Client allows us this optimization.
+#                #If we didn’t limit our inflate window before,
+#                #or if the window was bigger than what the client
+#                #is actually compressing with, then take the client’s value.
+#                if (!$self->{'inflate_max_window_bits'} || ($self->{'inflate_max_window_bits'} > $opts_hr->{'client_max_window_bits'})) {
+#                    $self->{'inflate_max_window_bits'} = delete $opts_hr->{'client_max_window_bits'};
+#                }
+#
+#                delete $opts_hr->{'client_max_window_bits'};
             }
 
             if (exists $opts_hr->{'server_no_context_takeover'}) {
@@ -83,30 +125,6 @@ sub consume_offer_header_parts {
     );
 
     return undef if !$use_ext;
-
-    return Net::WebSocket::Handshake::Extension->new(
-        $self->TOKEN(),
-
-        ( $self->{'peer_no_context_takeover'}
-            ? ( client_no_context_takeover => undef )
-            : ()
-        ),
-
-        ( $self->{'local_no_context_takeover'}
-            ? ( server_no_context_takeover => undef )
-            : ()
-        ),
-
-        ( $self->{'deflate_max_window_bits'}
-            ? ( server_max_window_bits => $self->{'deflate_max_window_bits'} )
-            : ()
-        ),
-
-        ( $self->{'inflate_max_window_bits'}
-            ? ( client_max_window_bits => $self->{'inflate_max_window_bits'} )
-            : ()
-        ),
-    );
 }
 
 1;
