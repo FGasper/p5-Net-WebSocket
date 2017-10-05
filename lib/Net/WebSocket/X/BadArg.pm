@@ -19,8 +19,11 @@ sub _new {
         );
     }
 
+    my $disp_val = $val;
+    $disp_val = q<> if !defined $val;
+
     return $class->SUPER::_new(
-        "$caller: invalid “$name” ($val)",
+        sprintf("%s: invalid “%s” (%s)", $caller, $name, $disp_val),
         name => $name,
         value => $val,
     );

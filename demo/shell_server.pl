@@ -23,6 +23,8 @@ use lib "$FindBin::Bin/lib";
 use MockReader ();
 use NWDemo ();
 
+use Text::Control ();
+
 use Net::WebSocket::Endpoint::Server ();
 use Net::WebSocket::Frame::text ();
 use Net::WebSocket::Frame::binary ();
@@ -31,6 +33,7 @@ use Net::WebSocket::Handshake::Server ();
 use Net::WebSocket::Parser ();
 
 use IO::Pty ();
+use IO::Stty ();
 
 #for setsid()
 use POSIX ();
@@ -43,6 +46,7 @@ if (index($host_port, ':') == -1) {
 
 my ($host, $port) = split m<:>, $host_port;
 
+#my $loop = IO::Events::Loop->new( debug => 1 );
 my $loop = IO::Events::Loop->new();
 
 my %sessions;
@@ -117,10 +121,15 @@ my $server = IO::Events::Socket::TCP->new(
                 $read_obj->add( $client_hdl->read() );
 
                 if ($did_handshake) {
-                    if (my $msg = $ept->get_next_message()) {
+
+                    #There could be multiple WebSocket messages
+                    #in the same TCP packet.
+                    while (my $msg = $ept->get_next_message()) {
 
                         #printf STDERR "from client: %s\n", ($msg->get_payload() =~ s<([\x80-\xff])><sprintf '\x%02x', ord $1>gre);
-                        #printf STDERR "from client: %v.02x\n", $msg->get_payload();
+                        #printf STDERR ">>>>> from browser: %d bytes\n", length $msg->get_payload();
+                        #printf STDERR ">>>>> from browser: %v.02x\n", $msg->get_payload();
+                        #print STDERR _printable( $msg->get_payload() ) . $/;
 
                         $shell_hdl->write( $msg->get_payload() );
                     }
@@ -145,6 +154,13 @@ my $server = IO::Events::Socket::TCP->new(
                     $did_handshake = 1;
 
                     my $pty = IO::Pty->new();
+
+                    #Ideally this would happen; however, since this
+                    #is being used to test zmodem.js let’s leave it out
+                    #to imitate a likely omission from other shell servers.
+                    #We will thus block any 0x0f and 0x16 bytes from reaching
+                    #the shell.
+                    #print IO::Stty::stty($pty, '-iexten');
 
                     $cpid = fork or do {
                         eval {
@@ -179,12 +195,16 @@ my $server = IO::Events::Socket::TCP->new(
                         #(WebSocket) client.
                         on_read => sub {
                             my ($self) = @_;
-                            my $frame = Net::WebSocket::Frame::text->new(
+
+                            #Needs to be binary in case of ZMODEM transfer.
+                            my $frame = Net::WebSocket::Frame::binary->new(
                                 payload_sr => \$self->read(),
                             );
 
                             #printf STDERR "to client: %s\n", ($frame->to_bytes() =~ s<([\x80-\xff])><sprintf '\x%02x', ord $1>gre);
-                            #printf STDERR "to client: %v.02x\n", $frame->get_payload();
+                            #printf STDERR "<<<<< to browser: %v.02x\n", $frame->get_payload();
+                            #printf STDERR "<<<<< to browser: %d\n", length $frame->get_payload();
+                            #print STDERR _printable( $frame->get_payload() ) . $/;
 
                             $client_hdl->write($frame->to_bytes());
                         },
@@ -196,10 +216,15 @@ my $server = IO::Events::Socket::TCP->new(
                         },
                     );
 
+#print STDERR "shell fileno: $shell_hdl->{'fileno'}\n";
+
                     $sessions{$session}{'shell'} = $shell_hdl;
                 }
             }
         );
+
+#use Data::Dumper;
+#print STDERR "browser fileno: $client_hdl->{'fileno'}\n";
 
         $sessions{$session} = {
             client => $client_hdl,
@@ -207,6 +232,8 @@ my $server = IO::Events::Socket::TCP->new(
         };
     },
 );
+
+*_printable = \&Text::Control::to_dot;
 
 while (1) {
     try {
