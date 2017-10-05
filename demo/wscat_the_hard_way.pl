@@ -225,7 +225,7 @@ sub _mux_after_handshake {
 
         #blocking
         my $ept = Net::WebSocket::Endpoint::Client->new(
-            out => $inet,
+            out => $iof,
             parser => $parser,
         );
 
@@ -237,7 +237,7 @@ sub _mux_after_handshake {
 
         die "read from remote: $!" if $!;
 
-        $ept->close('SUCCESS');
+        $ept->close( code => 'SUCCESS' );
 
         shutdown $inet, Socket::SHUT_WR();
 
