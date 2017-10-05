@@ -33,7 +33,6 @@ use Net::WebSocket::Handshake::Server ();
 use Net::WebSocket::Parser ();
 
 use IO::Pty ();
-use IO::Stty ();
 
 #for setsid()
 use POSIX ();
@@ -202,8 +201,8 @@ my $server = IO::Events::Socket::TCP->new(
                             );
 
                             #printf STDERR "to client: %s\n", ($frame->to_bytes() =~ s<([\x80-\xff])><sprintf '\x%02x', ord $1>gre);
-                            #printf STDERR "<<<<< to browser: %v.02x\n", $frame->get_payload();
-                            #printf STDERR "<<<<< to browser: %d\n", length $frame->get_payload();
+                            #printf STDERR "<<<<< to client: %v.02x\n", $frame->get_payload();
+                            #printf STDERR "<<<<< to client: %d\n", length $frame->get_payload();
                             #print STDERR _printable( $frame->get_payload() ) . $/;
 
                             $client_hdl->write($frame->to_bytes());
@@ -216,15 +215,10 @@ my $server = IO::Events::Socket::TCP->new(
                         },
                     );
 
-#print STDERR "shell fileno: $shell_hdl->{'fileno'}\n";
-
                     $sessions{$session}{'shell'} = $shell_hdl;
                 }
             }
         );
-
-#use Data::Dumper;
-#print STDERR "browser fileno: $client_hdl->{'fileno'}\n";
 
         $sessions{$session} = {
             client => $client_hdl,
@@ -233,7 +227,7 @@ my $server = IO::Events::Socket::TCP->new(
     },
 );
 
-*_printable = \&Text::Control::to_dot;
+#*_printable = \&Text::Control::to_dot;
 
 while (1) {
     try {
