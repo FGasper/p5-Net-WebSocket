@@ -3,11 +3,15 @@ package Net::WebSocket::PMCE::deflate::Data;
 use strict;
 use warnings;
 
+use Module::Load ();
+
 use Net::WebSocket::Message ();
+use Net::WebSocket::PMCE ();
 
 use constant {
-    INITIAL_FRAME_RSV => 0b100;  #RSV1
+    INITIAL_FRAME_RSV => 0b100,  #RSV1
     _ZLIB_SYNC_TAIL => "\0\0\xff\xff",
+    _DEBUG => 0,
 };
 
 =head2 I<CLASS>->new( %OPTS )
@@ -38,6 +42,8 @@ will do a full flush at the end of each C<compress()> call.
 sub new {
     my ($class, %opts) = @_;
 
+    #Validate deflate_max_window_bits/inflate_max_window_bits?
+
     my $compress_func = '_compress_';
     $compress_func .= $opts{'local_no_context_takeover'} ? 'full' : 'sync';
     $compress_func .= '_flush_chomp';
@@ -46,6 +52,8 @@ sub new {
 
     return bless \%opts, $class;
 }
+
+*message_is_compressed = *Net::WebSocket::PMCE::message_is_compressed;
 
 #----------------------------------------------------------------------
 
@@ -61,7 +69,7 @@ the message will be of type C<Net::WebSocket::Message::text>.
 sub create_message {
     my ($self, $frame_class) = @_;    #$_[2] = payload
 
-    my $compress_func = $opts{'final_frame_compress_func'};
+    my $compress_func = $self->{'final_frame_compress_func'};
 
     my $payload_sr = \($self->$compress_func( $_[2] ));
 
@@ -107,14 +115,14 @@ sub decompress {
 
     $self->{'i'} ||= $self->_create_inflate_obj();
 
-    _debug(sprintf "inflating: %v.02x\n", $_[1]) if _DEBUG;
+    _DEBUG && _debug(sprintf "inflating: %v.02x\n", $_[1]);
 
     $_[1] .= _ZLIB_SYNC_TAIL;
 
     my $status = $self->{'i'}->inflate($_[1], my $v);
     die $status if $status != Compress::Raw::Zlib::Z_OK();
 
-    _debug(sprintf "inflate output: [%v.02x]\n", $v) if _DEBUG;
+    _DEBUG && _debug(sprintf "inflate output: [%v.02x]\n", $v);
 
     return $v;
 }
@@ -126,24 +134,18 @@ my $_payload_sr;
 #cf. RFC 7692, 7.2.1
 #Use for fragments.
 sub _compress_sync_flush {
-    _load_zlib_if_needed();
-
     return $_[0]->_compress( $_[1], Compress::Raw::Zlib::Z_SYNC_FLUSH() );
 }
 
 #Preserves sliding window to the next message.
 #Use for final fragments when !!local_context_takeover
 sub _compress_sync_flush_chomp {
-    _load_zlib_if_needed();
-
     return _chomp_0000ffff_or_die( $_[0]->_compress( $_[1], Compress::Raw::Zlib::Z_SYNC_FLUSH() ) );
 }
 
 #Flushes the sliding window.
 #Use for final fragments when !local_context_takeover
 sub _compress_full_flush_chomp {
-    _load_zlib_if_needed();
-
     return _chomp_0000ffff_or_die( $_[0]->_compress( $_[1], Compress::Raw::Zlib::Z_FULL_FLUSH() ) );
 }
 
@@ -165,19 +167,19 @@ sub _compress {
 
     $self->{'d'} ||= $self->_create_deflate_obj();
 
-    _debug(sprintf "to deflate: [%v.02x]", $$_payload_sr) if _DEBUG;
+    _DEBUG && _debug(sprintf "to deflate: [%v.02x]", $$_payload_sr);
 
     my $out;
 
     my $dstatus = $self->{'d'}->deflate( $$_payload_sr, $out );
     die "deflate: $dstatus" if $dstatus != Compress::Raw::Zlib::Z_OK();
 
-    _debug(sprintf "post-deflate output: [%v.02x]", $out) if _DEBUG;
+    _DEBUG && _debug(sprintf "post-deflate output: [%v.02x]", $out);
 
     $dstatus = $self->{'d'}->flush($out, $_[2]);
     die "deflate flush: $dstatus" if $dstatus != Compress::Raw::Zlib::Z_OK();
 
-    _debug(sprintf "post-flush output: [%v.02x]", $out) if _DEBUG;
+    _DEBUG && _debug(sprintf "post-flush output: [%v.02x]", $out);
 
     #NB: The RFC directs at this point that:
     #
@@ -205,6 +207,8 @@ sub _compress {
 
 #----------------------------------------------------------------------
 
+my $zlib_is_loaded;
+
 sub _load_zlib_if_needed {
     $zlib_is_loaded ||= do {
         Module::Load::load('Compress::Raw::Zlib');
@@ -217,7 +221,9 @@ sub _load_zlib_if_needed {
 sub _create_inflate_obj {
     my ($self) = @_;
 
-    my $window_bits = $self->{'inflate_max_window_bits'} || $VALID_MAX_WINDOW_BITS[-1];
+    my $window_bits = $self->{'inflate_max_window_bits'} || 15; #XXX TODO
+
+    _load_zlib_if_needed();
 
     my ($inflate, $istatus) = Compress::Raw::Zlib::Inflate->new(
         -WindowBits => -$window_bits,
@@ -231,7 +237,9 @@ sub _create_inflate_obj {
 sub _create_deflate_obj {
     my ($self) = @_;
 
-    my $window_bits = $self->{'deflate_max_window_bits'} || $VALID_MAX_WINDOW_BITS[-1];
+    my $window_bits = $self->{'deflate_max_window_bits'} || 15; #XXX TODO
+
+    _load_zlib_if_needed();
 
     my ($deflate, $dstatus) = Compress::Raw::Zlib::Deflate->new(
         -WindowBits => -$window_bits,

@@ -60,6 +60,10 @@ sub handshake_as_server {
         $hdr_text .= $_ . CRLF for $req_handler->($req);
     }
 
+use Data::Dumper;
+$Data::Dumper::Useqq = 1;
+print STDERR Dumper($hdr_text);
+
     print { $inet } $hdr_text . CRLF or die "send(): $!";
 
     return;

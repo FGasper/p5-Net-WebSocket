@@ -60,14 +60,14 @@ while ( my $sock = $server->accept() ) {
 
     my @exts;
 
-    my $deflate;
+    my $deflate_data;
 
     NWDemo::handshake_as_server(
         $sock,
         sub {
             my ($req) = @_;
 
-            #my $deflate = Net::WebSocket::PMCE::deflate::Server->new();
+            my $deflate = Net::WebSocket::PMCE::deflate::Server->new();
 
             my $exts = $req->header('Sec-WebSocket-Extensions');
             return if !defined $exts;
@@ -79,32 +79,13 @@ while ( my $sock = $server->accept() ) {
             @extensions = map { Net::WebSocket::Handshake::Extension->parse_string($_) } @extensions;
 
             for my $ext (@extensions) {
-                my @params = $ext->parameters();
                 printf "Requested extension: %s\n", $ext->to_string();
+            }
 
-                if ($ext->get_token() eq Net::WebSocket::PMCE::deflate::Server->TOKEN()) {
-                    my @errs = Net::WebSocket::PMCE::deflate::Server->get_received_parameter_errors( $ext->get_parameters() );
-                    if (@errs) {
-
-                        #TODO: propertly quote
-                        return map { "X-WebSocket-permessage-deflate-Error: $_" } for @errs;
-                    }
-                    else {
-
-                        #Here will be logic to determine if we will accept
-                        #the client’s requested configuration. We know that
-                        #the request is legitimate as per the protocol, but
-                        #an individual server configuration might want to
-                        #disallow one particular configuration or another.
-                        #
-                        #For now we’ll just pass the parameters as they are.
-
-                        $deflate = Net::WebSocket::PMCE::deflate::Server->new( $ext->get_parameters() );
-
-                        return 'Sec-WebSocket-Extensions: ' . $deflate->get_handshake_object()->to_string();
-                    }
-                }
-
+            if ($deflate->consume_peer_extensions(@extensions)) {
+                $deflate_data = $deflate->create_data_object();
+                my $hsk = $deflate->get_handshake_object();
+                return "Sec-WebSocket-Extensions: " . $hsk->to_string();
             }
 
             return;
@@ -162,20 +143,21 @@ while ( my $sock = $server->accept() ) {
             #If this returns falsey, whether we get undef or q<>
             #we react the same way.
             if ( $msg ) {
-                #TODO: handle $deflate
-
-                my $payload = $msg->get_payload();
-
-                #TODO: handle $deflate
-
                 my $answer_f = 'Net::WebSocket::Frame::' . $msg->get_type();
-                $answer_f = $answer_f->new(
-                    payload_sr => \$payload,
-                );
 
-                my $answer = Net::WebSocket::Message::create_from_frames($answer_f);
+                if ($deflate_data->message_is_compressed($msg)) {
+                    $answer_f = $deflate_data->create_message(
+                        $answer_f,
+                        $deflate_data->decompress( $msg->get_payload() ),
+                    );
+                }
+                else {
+                    $answer_f = $answer_f->new(
+                        payload_sr => \$msg->get_payload(),
+                    );
+                }
 
-                $framed_obj->write( $answer->to_bytes() );
+                $framed_obj->write( $answer_f->to_bytes() );
             }
         }
     }

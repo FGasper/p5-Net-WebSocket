@@ -173,7 +173,9 @@ sub run {
 
                 $payload = $msg->get_payload();
 
-                syswrite( \*STDOUT, substr( $payload, 0, 64, q<> ) ) while length $payload;
+                while (length $payload) {
+                    syswrite( \*STDOUT, substr( $payload, 0, 65536, q<> ) ) or die "write(STDOUT): $!";
+                }
             }
 
             #Handle any control frames we might need to write out.

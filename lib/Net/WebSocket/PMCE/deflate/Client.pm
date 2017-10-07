@@ -14,13 +14,13 @@ use constant {
     _INFLATE_MAX_WINDOW_BITS_PARAM => 'server_max_window_bits',
 };
 
-sub create_header {
+sub _create_header {
     my ($self) = @_;
 
     #Let’s always advertise support for this feature.
     local $self->{_DEFLATE_MAX_WINDOW_BITS_PARAM()} = undef if !exists $self->{_DEFLATE_MAX_WINDOW_BITS_PARAM()};
 
-    return $self->SUPER::create_header();
+    return $self->SUPER::_create_header();
 }
 
 sub consume_peer_extensions {

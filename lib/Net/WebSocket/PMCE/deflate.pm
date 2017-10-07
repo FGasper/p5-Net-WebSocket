@@ -86,6 +86,8 @@ use warnings;
 
 use parent 'Net::WebSocket::PMCE';
 
+use Carp::Always;
+
 use Call::Context ();
 use Module::Load ();
 
@@ -94,7 +96,6 @@ use Net::WebSocket::X ();
 
 use constant {
     TOKEN => 'permessage-deflate',
-    _DEBUG => 0,
 };
 
 use constant VALID_MAX_WINDOW_BITS => qw( 8 9 10 11 12 13 14 15 );
@@ -187,7 +188,8 @@ sub create_data_object {
     my ($self) = @_;
 
     #TODO: rename classes
-    my $class = ref($self) . '::' . $self->_ENDPOINT_CLASS();
+    my $class = __PACKAGE__ . '::Data::' . $self->_ENDPOINT_CLASS();
+    Module::Load::load($class);
 
     return $class->new( %$self );
 }
@@ -199,30 +201,6 @@ sub get_handshake_object {
         $self->_create_header(),
     );
 }
-
-#        $self->TOKEN(),
-#
-#        ( $self->{'peer_no_context_takeover'}
-#            ? ( $self->_PEER_NO_CONTEXT_TAKEOVER_PARAM() => undef )
-#            : ()
-#        ),
-#
-#        ( $self->{'local_no_context_takeover'}
-#            ? ( $self->_LOCAL_NO_CONTEXT_TAKEOVER_PARAM() => undef )
-#            : ()
-#        ),
-#
-#        ( $self->{'deflate_max_window_bits'}
-#            ? ( $self->_DEFLATE_MAX_WINDOW_BITS_PARAM() => $self->{'deflate_max_window_bits'} )
-#            : ()
-#        ),
-#
-#        ( $self->{'inflate_max_window_bits'}
-#            ? ( $self->_INFLATE_MAX_WINDOW_BITS_PARAM() => $self->{'inflate_max_window_bits'} )
-#            : ()
-#        ),
-#    );
-#}
 
 #----------------------------------------------------------------------
 
@@ -236,16 +214,10 @@ sub _create_header {
     if (exists $self->{'deflate_max_window_bits'}) {
         push @parts, $self->{_DEFLATE_MAX_WINDOW_BITS_PARAM()} => $self->{'deflate_max_window_bits'};
     }
-    else {
-        #Let’s advertise our support for this feature.
-        push @parts, client_max_window_bits => undef,
-    }
 
     if (exists $self->{'inflate_max_window_bits'}) {
         push @parts, $self->{_INFLATE_MAX_WINDOW_BITS_PARAM()} => $self->{'inflate_max_window_bits'};
     }
-
-    #push @parts, client_no_context_takeover => $self->{'local_no_context_takeover'};
 
     if ($self->{'local_no_context_takeover'}) {
         push @parts, $self->{_LOCAL_NO_CONTEXT_TAKEOVER_PARAM()} => undef;
@@ -327,14 +299,14 @@ sub consume_peer_extensions {
         $self->_consume_extension_options(\%opts);
 
         if (%opts) {
-            my ($token, @params) = $ext->parameters();
+            my ($token, @params) = ($ext->token(), %opts);
             die "Unrecognized for “$token”: @params";
         }
 
-        return $self->{'_use_ok'} = 1;
+        $self->{'_use_ok'}++;
     }
 
-    return;
+    return $self->{'_use_ok'};
 }
 
 # 7. .. A server MUST decline an extension negotiation offer for this
