@@ -39,33 +39,22 @@ issues you find.
 
 =head1 METHODS
 
-These are available on all instances:
+Available on all instances:
 
 =head2 I<OBJ>->message_is_compressed( MESSAGE )
 
-The inputs to these are instances of L<Net::WebSocket::Frame>
-and L<Net::WebSocket::Message>, respectively. Output is a Perl boolean.
+MESSAGE is an instance of L<Net::WebSocket::Message>.
+Output is a Perl boolean.
 
-These may also be called as class methods, e.g.:
+You can also call this as a class method, e.g.:
 
     Net::WebSocket::PMCE->message_is_compressed( $message_obj );
 
 =head1 SUBCLASS INTERFACE
 
-To make a working subclass of this module you need to provide:
-
-=over
-
-=item 1. Some means of
-decompression; it is suggested that you follow
-the pattern of C<Net::WebSocket::PMCE::deflate::decompress()>.
-Ultimately, though, it’s up to you how you do this.
-
-=item 2. A C<_compress_frame( FRAME )> method, which alters the
-passed-in FRAME object (an instance of L<Net::WebSocket::Frame>)
-to do the actual compression.
-
-=back
+To make a working subclass of this module you need to provide
+means of compression and decompression. It is suggested to follow
+the pattern of C<Net::WebSocket::PMCE::deflate>.
 
 =cut
 

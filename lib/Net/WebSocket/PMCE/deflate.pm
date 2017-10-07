@@ -92,37 +92,33 @@ use Module::Load ();
 use Net::WebSocket::Handshake::Extension ();
 use Net::WebSocket::X ();
 
-my $zlib_is_loaded;
-
-my @VALID_MAX_WINDOW_BITS = qw( 8 9 10 11 12 13 14 15 );
-
 use constant {
     TOKEN => 'permessage-deflate',
-
-    _ZLIB_SYNC_TAIL => "\0\0\xff\xff",
     _DEBUG => 0,
 };
 
-=head2 validate_max_window_bits( BITS )
+use constant VALID_MAX_WINDOW_BITS => qw( 8 9 10 11 12 13 14 15 );
 
-This validates a value given in either the C<server_max_window_bits>
-or C<client_max_window_bits> handshake parameters. This function considers an
-undefined value to be an error, so you need to check
-whether C<client_max_window_bits> was given with a value or not.
-
-=cut
-
-sub validate_max_window_bits {
-    my ($bits) = @_;
-
-    if (defined $bits) {
-        return if grep { $_ eq $bits } @VALID_MAX_WINDOW_BITS;
-
-        die Net::WebSocket::X->create( 'BadArg', "Must be one of: [@VALID_MAX_WINDOW_BITS]" );
-    }
-
-    die Net::WebSocket::X->create( 'BadArg', "Must have a value, one of: [@VALID_MAX_WINDOW_BITS]" );
-}
+#=head2 validate_max_window_bits( BITS )
+#
+#This validates a value given in either the C<server_max_window_bits>
+#or C<client_max_window_bits> handshake parameters. This function considers an
+#undefined value to be an error, so you need to check
+#whether C<client_max_window_bits> was given with a value or not.
+#
+#=cut
+#
+#sub validate_max_window_bits {
+#    my ($bits) = @_;
+#
+#    if (defined $bits) {
+#        return if grep { $_ eq $bits } @VALID_MAX_WINDOW_BITS;
+#
+#        die Net::WebSocket::X->create( 'BadArg', "Must be one of: [@VALID_MAX_WINDOW_BITS]" );
+#    }
+#
+#    die Net::WebSocket::X->create( 'BadArg', "Must have a value, one of: [@VALID_MAX_WINDOW_BITS]" );
+#}
 
 =head1 METHODS
 
@@ -135,26 +131,19 @@ Returns a new instance of this class.
 
 C<%OPTS> is:
 
-WAS:
-
 =over
 
 =item C<deflate_max_window_bits> - optional; the number of window bits to use
-for compressing messages. This should correspond with local endpoint’s
-behavior; i.e., for a server, this should match the C<server_max_window_bits>
-extension parameter in the WebSocket handshake.
+for compressing messages.
 
 =item C<inflate_max_window_bits> - optional; the number of window bits to use
-for decompressing messages. This should correspond with remote peer’s
-behavior; i.e., for a server, this should match the C<client_max_window_bits>
-extension parameter in the WebSocket handshake.
+for decompressing messages.
 
-=item C<local_no_context_takeover> - corresponds to either the
-C<client_no_context_takeover> or C<server_no_context_takeover> parameter,
-to match the local endpoint’s role. When this flag is set, the object
-will do a full flush at the end of each C<compress_frame()> or
-C<compress_message()> call. (It is thus advantageous to favor
-C<compress_message()> when this flag is active.)
+=item C<local_no_context_takeover> - boolean; when this flag is set, the Data
+object will do a full flush at the end of each C<compress()> call.
+
+=item C<peer_no_context_takeover> - boolean; whether to ask the peer not to
+use context takeover when it compresses messages.
 
 =back
 
@@ -163,223 +152,194 @@ C<compress_message()> when this flag is active.)
 sub new {
     my ($class, %opts) = @_;
 
-    $opts{'deflate_max_window_bits'} = delete $opts{ $class->_DEFLATE_MAX_WINDOW_BITS_PARAM() };
-    $opts{'inflate_max_window_bits'} = delete $opts{ $class->_INFLATE_MAX_WINDOW_BITS_PARAM() };
-    $opts{'local_no_context_takeover'} = delete $opts{ $class->_LOCAL_NO_CONTEXT_TAKEOVER_PARAM() };
+    my @errs = $class->_get_parameter_errors(%opts);
+    die "@errs" if @errs;
 
     return bless \%opts, $class;
 }
 
-sub local_no_context_takeover {
-    return $_[0]{'local_no_context_takeover'};
+sub deflate_max_window_bits {
+    my ($self) = @_;
+
+    return $self->{'deflate_max_window_bits'} || ( $self->VALID_MAX_WINDOW_BITS() )[-1];
 }
 
-=head2 $decompressed = I<OBJ>->decompress( COMPRESSED_PAYLOAD )
+sub inflate_max_window_bits {
+    my ($self) = @_;
 
-Decompresses the given string and returns the result.
+    return $self->{'inflate_max_window_bits'} || ( $self->VALID_MAX_WINDOW_BITS() )[-1];
+}
 
-B<NOTE:> This function alters COMPRESSED_PAYLOAD.
+sub local_no_context_takeover {
+    my ($self) = @_;
 
-=cut
+    return !!$self->{'local_no_context_takeover'};
+}
 
-#cf. RFC 7692, 7.2.2
-sub decompress {
-    my ($self) = @_;    #$_[1] = payload
+sub peer_no_context_takeover {
+    my ($self) = @_;
 
-    $self->{'i'} ||= $self->_create_inflate_obj();
+    return !!$self->{'peer_no_context_takeover'};
+}
 
-    _debug(sprintf "inflating: %v.02x\n", $_[1]) if _DEBUG;
+#Convenience
+sub create_data_object {
+    my ($self) = @_;
 
-    $_[1] .= _ZLIB_SYNC_TAIL;
+    #TODO: rename classes
+    my $class = ref($self) . '::' . $self->_ENDPOINT_CLASS();
 
-    my $status = $self->{'i'}->inflate($_[1], my $v);
-    die $status if $status != Compress::Raw::Zlib::Z_OK();
-
-    _debug(sprintf "inflate output: [%v.02x]\n", $v) if _DEBUG;
-
-    return $v;
+    return $class->new( %$self );
 }
 
 sub get_handshake_object {
     my ($self) = @_;
 
     return Net::WebSocket::Handshake::Extension->new(
-        $self->TOKEN(),
-
-        ( $self->{'peer_no_context_takeover'}
-            ? ( $self->_PEER_NO_CONTEXT_TAKEOVER_PARAM() => undef )
-            : ()
-        ),
-
-        ( $self->{'local_no_context_takeover'}
-            ? ( $self->_LOCAL_NO_CONTEXT_TAKEOVER_PARAM() => undef )
-            : ()
-        ),
-
-        ( $self->{'deflate_max_window_bits'}
-            ? ( $self->_DEFLATE_MAX_WINDOW_BITS_PARAM() => $self->{'deflate_max_window_bits'} )
-            : ()
-        ),
-
-        ( $self->{'inflate_max_window_bits'}
-            ? ( $self->_INFLATE_MAX_WINDOW_BITS_PARAM() => $self->{'inflate_max_window_bits'} )
-            : ()
-        ),
+        $self->_create_header(),
     );
 }
 
+#        $self->TOKEN(),
+#
+#        ( $self->{'peer_no_context_takeover'}
+#            ? ( $self->_PEER_NO_CONTEXT_TAKEOVER_PARAM() => undef )
+#            : ()
+#        ),
+#
+#        ( $self->{'local_no_context_takeover'}
+#            ? ( $self->_LOCAL_NO_CONTEXT_TAKEOVER_PARAM() => undef )
+#            : ()
+#        ),
+#
+#        ( $self->{'deflate_max_window_bits'}
+#            ? ( $self->_DEFLATE_MAX_WINDOW_BITS_PARAM() => $self->{'deflate_max_window_bits'} )
+#            : ()
+#        ),
+#
+#        ( $self->{'inflate_max_window_bits'}
+#            ? ( $self->_INFLATE_MAX_WINDOW_BITS_PARAM() => $self->{'inflate_max_window_bits'} )
+#            : ()
+#        ),
+#    );
+#}
+
 #----------------------------------------------------------------------
 
-#Used by subclasses
-sub _consume_header_parts {
-    my ($self, $extensions_ar, $foreach_cr) = @_;
+sub _create_header {
+    my ($self) = @_;
 
-    my $use_ext;
+    Call::Context::must_be_list();
 
-    for my $ext_ar (@$extensions_ar) {
-        next if $ext_ar->[0] ne TOKEN();
-        $use_ext = 1;
+    my @parts = $self->TOKEN();
 
-        my %opts = @{$ext_ar}[ 1 .. $#$ext_ar ];
-
-        return ( TOKEN() => undef, $foreach_cr->(\%opts) );
-
-#        if (%opts) {
-#            my @list = %opts;
-#            warn "Unrecognized: @list";
-#        }
-    }
-
-    return;
-}
-
-#----------------------------------------------------------------------
-
-my $_payload_sr;
-
-#cf. RFC 7692, 7.2.1
-sub compress_sync_flush {
-    _load_zlib_if_needed();
-
-    return $_[0]->_compress( $_[1], Compress::Raw::Zlib::Z_SYNC_FLUSH() );
-}
-
-sub compress_sync_flush_chomp {
-    _load_zlib_if_needed();
-
-    return _chomp_0000ffff_or_die( $_[0]->_compress( $_[1], Compress::Raw::Zlib::Z_SYNC_FLUSH() ) );
-}
-
-sub compress_full_flush_chomp {
-    _load_zlib_if_needed();
-
-    return _chomp_0000ffff_or_die( $_[0]->_compress( $_[1], Compress::Raw::Zlib::Z_FULL_FLUSH() ) );
-}
-
-sub _chomp_0000ffff_or_die {
-    if ( substr($_[0], -4) eq _ZLIB_SYNC_TAIL ) {
-        substr($_[0], -4) = q<>;
+    if (exists $self->{'deflate_max_window_bits'}) {
+        push @parts, $self->{_DEFLATE_MAX_WINDOW_BITS_PARAM()} => $self->{'deflate_max_window_bits'};
     }
     else {
-        die sprintf('deflate/flush didn’t end with expected SYNC tail (00.00.ff.ff): %v.02x', $_[0]);
+        #Let’s advertise our support for this feature.
+        push @parts, client_max_window_bits => undef,
     }
 
-    return $_[0];
+    if (exists $self->{'inflate_max_window_bits'}) {
+        push @parts, $self->{_INFLATE_MAX_WINDOW_BITS_PARAM()} => $self->{'inflate_max_window_bits'};
+    }
+
+    #push @parts, client_no_context_takeover => $self->{'local_no_context_takeover'};
+
+    if ($self->{'local_no_context_takeover'}) {
+        push @parts, $self->{_LOCAL_NO_CONTEXT_TAKEOVER_PARAM()} => undef;
+    }
+    if ($self->{'peer_no_context_takeover'}) {
+        push @parts, $self->{_PEER_NO_CONTEXT_TAKEOVER_PARAM()} => undef;
+    }
+
+    return @parts;
 }
 
-sub _compress {
-    my ($self) = @_;
 
-    $_payload_sr = \$_[1];
+=head2 I<OBJ>->consume_peer_extensions( EXTENSIONS )
 
-    $self->{'d'} ||= $self->_create_deflate_obj();
+Alters the given object as per the peer’s request. Ordinarily
+this should be fine, but if for some reason you want to reject the peer’s
+requested options you can inspect the object after this.
 
-    _debug(sprintf "to deflate: [%v.02x]", $$_payload_sr) if _DEBUG;
+The alterations made in response to the different extension
+options are:
 
-    my $out;
+=over
 
-    my $dstatus = $self->{'d'}->deflate( $$_payload_sr, $out );
-    die "deflate: $dstatus" if $dstatus != Compress::Raw::Zlib::Z_OK();
+=item * Client
 
-    _debug(sprintf "post-deflate output: [%v.02x]", $out) if _DEBUG;
+=over
 
-    $dstatus = $self->{'d'}->flush($out, $_[2]);
-    die "deflate flush: $dstatus" if $dstatus != Compress::Raw::Zlib::Z_OK();
+=item * <client_no_context_takeover> - Sets the object’s
+C<local_no_context_takeover> flag.
 
-    _debug(sprintf "post-flush output: [%v.02x]", $out) if _DEBUG;
+=item * <server_no_context_takeover> - If the object’s
+C<peer_no_context_takeover> flag is set, and if
+we do *not* receive this flag from the peer, then we C<die()>.
+This option is ignored otherwise.
 
-    #NB: The RFC directs at this point that:
-    #
-    #If the resulting data does not end with an empty DEFLATE block
-    #with no compression (the "BTYPE" bits are set to 00), append an
-    #empty DEFLATE block with no compression to the tail end.
-    #
-    #… but I don’t know the protocol well enough to detect that??
-    #
-    #NB:
-    #> perl -MCompress::Raw::Zlib -e' my $deflate = Compress::Raw::Zlib::Deflate->new( -WindowBits => -8, -AppendOutput => 1, -Level => Compress::Raw::Zlib::Z_NO_COMPRESSION ); $deflate->deflate( "", my $out ); $deflate->flush( $out, Compress::Raw::Zlib::Z_SYNC_FLUSH()); print $out' | xxd
-    #00000000: 0000 00ff ff                             .....
+=item * <client_max_window_bits> - If given and less than the object’s
+C<deflate_max_window_bits> option, then that option is reduced to the
+new value.
 
-#    if ( $_[2] == Compress::Raw::Zlib::Z_FULL_FLUSH() ) {
-#        if ( substr($out, -4) eq _ZLIB_SYNC_TAIL ) {
-#            substr($out, -4) = q<>;
-#        }
-#        else {
-#            die sprintf('deflate/flush didn’t end with expected SYNC tail (00.00.ff.ff): %v.02x', $out);
-#        }
-#    }
+=item * <server_max_window_bits> - If given and less than the object’s
+C<inflate_max_window_bits> option, then that option is reduced to the
+new value. If given and B<greater> than the object’s
+C<inflate_max_window_bits> option, then we C<die()>.
 
-    return $out;
-}
+=back
 
-#----------------------------------------------------------------------
+=item * Server
 
-sub _load_zlib_if_needed {
-    $zlib_is_loaded ||= do {
-        Module::Load::load('Compress::Raw::Zlib');
-        1;
-    };
+=over
+
+=item * <client_no_context_takeover> - Sets the object’s
+C<peer_no_context_takeover> flag.
+
+=item * <server_no_context_takeover> - Sets the object’s
+C<local_no_context_takeover> flag.
+
+=item * <client_max_window_bits> - If given and less than the object’s
+C<inflate_max_window_bits> option, then that option is reduced to the
+new value.
+
+=item * <server_max_window_bits> - If given and less than the object’s
+C<deflate_max_window_bits> option, then that option is reduced to the
+new value.
+
+=back
+
+=back
+
+=cut
+
+sub consume_peer_extensions {
+    my ($self, @extensions) = @_;
+
+    for my $ext (@extensions) {
+        next if $ext->token() ne $self->TOKEN();
+
+        my %opts = $ext->parameters();
+
+        $self->_consume_extension_options(\%opts);
+
+        if (%opts) {
+            my ($token, @params) = $ext->parameters();
+            die "Unrecognized for “$token”: @params";
+        }
+
+        return $self->{'_use_ok'} = 1;
+    }
 
     return;
 }
-
-sub _create_inflate_obj {
-    my ($self) = @_;
-
-    my $window_bits = $self->{'inflate_max_window_bits'} || $VALID_MAX_WINDOW_BITS[-1];
-
-    my ($inflate, $istatus) = Compress::Raw::Zlib::Inflate->new(
-        -WindowBits => -$window_bits,
-        -AppendOutput => 1,
-    );
-    die "Inflate: $istatus" if $istatus != Compress::Raw::Zlib::Z_OK();
-
-    return $inflate;
-}
-
-sub _create_deflate_obj {
-    my ($self) = @_;
-
-    my $window_bits = $self->{'deflate_max_window_bits'} || $VALID_MAX_WINDOW_BITS[-1];
-
-    my ($deflate, $dstatus) = Compress::Raw::Zlib::Deflate->new(
-        -WindowBits => -$window_bits,
-        -AppendOutput => 1,
-    );
-    die "Deflate: $dstatus" if $dstatus != Compress::Raw::Zlib::Z_OK();
-
-    return $deflate;
-}
-
-sub _debug {
-    print STDERR "$_[0]$/";
-}
-
-#----------------------------------------------------------------------
 
 # 7. .. A server MUST decline an extension negotiation offer for this
 # extension if any of the following conditions are met:
-sub get_received_parameter_errors {
+sub _get_parameter_errors {
     my ($class, @params_kv) = @_;
 
     my %params;
@@ -420,41 +380,38 @@ sub get_received_parameter_errors {
     return @errors;
 }
 
-sub _validate_client_no_context_takeover {
-    return __validate_no_context_takeover('client', $_[1]);
+#Define these as no-ops because all we care about is their truthiness.
+use constant _validate_local_no_context_takeover => ();
+use constant _validate_peer_no_context_takeover => ();
+
+sub _validate_deflate_max_window_bits {
+    return $_[0]->__validate_max_window_bits( 'deflate', $_[1] );
 }
 
-sub _validate_server_no_context_takeover {
-    return __validate_no_context_takeover('server', $_[1]);
-}
-
-sub _validate_client_max_window_bits {
-    return __validate_max_window_bits( 'client', $_[1] );
-}
-
-sub _validate_server_max_window_bits {
-    return __validate_max_window_bits( 'server', $_[1] );
+sub _validate_inflate_max_window_bits {
+    return $_[0]->__validate_max_window_bits( 'inflate', $_[1] );
 }
 
 sub __validate_no_context_takeover {
-    if (defined $_[1]) {
-        return "/$_[0]_no_context_takeover/ must not have a value.";
+    my ($self, $endpoint, $value) = @_;
+
+    if (defined $value) {
+        return "/${endpoint}_no_context_takeover/ must not have a value.";
     }
 
     return;
 }
 
 sub __validate_max_window_bits {
-    my ($ept, $bits) = @_;
+    my ($self, $ept, $bits) = @_;
+
+    my @VALID_MAX_WINDOW_BITS = VALID_MAX_WINDOW_BITS();
 
     if (defined $bits) {
         return if grep { $_ eq $bits } @VALID_MAX_WINDOW_BITS;
     }
-    else {
-        return "/${ept}_max_window_bits/ must have a value.";
-    }
 
-    return "Invalid value for /${ept}_max_window_bits/ ($bits)";
+    return Net::WebSocket::X->create( 'BadArg', "${ept}_max_window_bits" => $bits, "Must be one of: [@VALID_MAX_WINDOW_BITS]" );
 }
 
 #----------------------------------------------------------------------
