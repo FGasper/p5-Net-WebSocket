@@ -25,7 +25,7 @@ sub _consume_extension_options {
 
         if (exists $opts_hr->{$mwb_opt}) {
             my $self_opt = "$ept_opt->[1]_max_window_bits";
-            $self->__validate_max_window_bits($opts_hr->{$mwb_opt});
+            $self->__validate_max_window_bits($ept_opt->[0], $opts_hr->{$mwb_opt});
 
             my $max = $self->{$self_opt} || ( $self->VALID_MAX_WINDOW_BITS() )[-1];
 
