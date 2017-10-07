@@ -25,10 +25,14 @@ use Net::WebSocket::Frame::close  ();
 use Net::WebSocket::Handshake::Client ();
 use Net::WebSocket::Parser ();
 
+use Net::WebSocket::PMCE::deflate::Client ();
+
 use constant {
     MAX_CHUNK_SIZE => 64000,
     CRLF => "\x0d\x0a",
     DEBUG => 1,
+
+    SEND_FRAME_CLASS => 'Net::WebSocket::Frame::binary',
 };
 
 #No PIPE
@@ -107,6 +111,10 @@ sub run {
 
     my $handshake;
 
+    my $deflate = Net::WebSocket::PMCE::deflate::Client->new();
+    my $deflate_hsk = $deflate->get_handshake_object();
+    my $deflate_data;
+
     $handle = IO::Events::Handle->new(
         owner => $loop,
         handle => $inet,
@@ -123,7 +131,11 @@ sub run {
             );
 
             my $hdr = $handshake->create_header_text();
+            $hdr .= 'Sec-WebSocket-Extensions: ' . $deflate_hsk->to_string() . CRLF;
 
+use Data::Dumper;
+$Data::Dumper::Useqq = 1;
+print STDERR Dumper(sending => $hdr);
             $self->write( $hdr . CRLF );
 
             $sent_handshake = 1;
@@ -158,6 +170,20 @@ sub run {
                 my $accept = $req->header('Sec-WebSocket-Accept');
                 $handshake->validate_accept_or_die($accept);
 
+                #--------------
+                my $exts = $req->header('Sec-WebSocket-Extensions');
+
+                #a list of strings
+                my @extensions = ref($exts) ? @$exts : ($exts);
+
+                #now it’s a list of objects
+                @extensions = map { Net::WebSocket::Handshake::Extension->parse_string($_) } @extensions;
+                #--------------
+
+                if ( $deflate->consume_peer_extensions(@extensions) ) {
+                    $deflate_data = $deflate->create_data_object();
+                }
+
                 $got_handshake = 1;
             }
 
@@ -178,11 +204,6 @@ sub run {
                 }
             }
 
-            #Handle any control frames we might need to write out.
-            while ( my $msg = $ept->get_next_message() ) {
-                $self->write($msg->to_bytes());
-            }
-
             $timeout->start();
         },
     );
@@ -195,10 +216,21 @@ sub run {
         on_read => sub {
             my ($self) = @_;
 
-            my $frame = Net::WebSocket::Frame::binary->new(
-                payload_sr => \$self->read(),
-                mask => Net::WebSocket::Mask::create(),
-            );
+            my $frame;
+
+            if ($deflate_data) {
+                $frame = $deflate_data->create_message(
+                    SEND_FRAME_CLASS(),
+                    $self->read(),
+                );
+            }
+            else {
+                $frame = SEND_FRAME_CLASS()->new(
+                    payload_sr => \$self->read(),
+                    mask => Net::WebSocket::Mask::create(),
+                );
+            }
+print STDERR Dumper($frame);
 
             $handle->write($frame->to_bytes());
         },

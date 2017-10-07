@@ -60,37 +60,7 @@ while ( my $sock = $server->accept() ) {
 
     my @exts;
 
-    my $deflate_data;
-
-    NWDemo::handshake_as_server(
-        $sock,
-        sub {
-            my ($req) = @_;
-
-            my $deflate = Net::WebSocket::PMCE::deflate::Server->new();
-
-            my $exts = $req->header('Sec-WebSocket-Extensions');
-            return if !defined $exts;
-
-            #a list of strings
-            my @extensions = ref($exts) ? @$exts : ($exts);
-
-            #now it’s a list of objects
-            @extensions = map { Net::WebSocket::Handshake::Extension->parse_string($_) } @extensions;
-
-            for my $ext (@extensions) {
-                printf "Requested extension: %s\n", $ext->to_string();
-            }
-
-            if ($deflate->consume_peer_extensions(@extensions)) {
-                $deflate_data = $deflate->create_data_object();
-                my $hsk = $deflate->get_handshake_object();
-                return "Sec-WebSocket-Extensions: " . $hsk->to_string();
-            }
-
-            return;
-        },
-    );
+    my $deflate_data = NWDemo::handshake_as_server( $sock );
 
     NWDemo::set_signal_handlers_for_server($sock);
 
@@ -145,7 +115,7 @@ while ( my $sock = $server->accept() ) {
             if ( $msg ) {
                 my $answer_f = 'Net::WebSocket::Frame::' . $msg->get_type();
 
-                if ($deflate_data->message_is_compressed($msg)) {
+                if ($deflate_data && $deflate_data->message_is_compressed($msg)) {
                     $answer_f = $deflate_data->create_message(
                         $answer_f,
                         $deflate_data->decompress( $msg->get_payload() ),

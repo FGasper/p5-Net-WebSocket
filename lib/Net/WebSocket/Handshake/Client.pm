@@ -80,7 +80,52 @@ sub new {
 
     $opts{'key'} ||= _create_key();
 
+    if ($opts{'extensions'}) {
+        $opts{'_request_extension_tokens'} = [ map { $_->token() } @{ $opts{'extensions'} } ];
+    }
+
     return bless \%opts, $class;
+}
+
+sub consume_peer_header {
+    my ($self, $name => $value) = @_;
+
+    if ($name eq 'Sec-WebSocket-Accept') {
+        $self->validate_accept_or_die($value);
+    }
+    elsif ($name eq 'Sec-WebSocket-Protocol') {
+        if (exists $self->{'_peer_protocol'}) {
+            die 'Already got Sec-WebSocket-Protocol!';  #XXX object TODO
+        }
+
+        Module::Load::load('HTTP::Headers::Util');
+
+        my @split = HTTP::Headers::Util::split_header_words($value);
+        if ((@split > 1) || defined $split[0][1]) {
+            die "Invalid Sec-WebSocket-Protocol: $value";   #XXX object TODO
+        }
+
+        $self->{'_peer_protocol'} = $value;
+    }
+    elsif ($name eq 'Sec-WebSocket-Extensions') {
+        Module::Load::load('Net::WebSocket::Handshake::Extension');
+
+        for my $ext ( Net::WebSocket::Handshake::Extension->parse_string($value) ) {
+            if (!grep { $_ eq $ext->token() } @{ $opts{'_request_extension_tokens'} }) {
+                die "Received invalid extension: $value";   #XXX object TODO
+            }
+
+            push @{ $self->{'_peer_extensions'} }, $ext;
+        }
+    }
+
+    return;
+}
+
+sub get_peer_protocol {
+    my $self = shift;
+
+    return $self->{'_peer_protocol'};
 }
 
 sub _create_header_lines {

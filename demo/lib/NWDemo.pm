@@ -10,6 +10,7 @@ use IO::SigGuard ();
 
 use Net::WebSocket::Handshake::Server ();
 use Net::WebSocket::Frame::close ();
+use Net::WebSocket::PMCE::deflate::Server ();
 
 use constant MAX_CHUNK_SIZE => 64000;
 
@@ -29,25 +30,30 @@ sub get_server_handshake_from_text {
     my $method = $req->method();
     die "Must be GET, not “$method” ($hdrs_txt)" if $method ne 'GET';
 
-    #Forgo validating headers. Life’s too short, and it’s a demo.
+    my $pmd = Net::WebSocket::PMCE::deflate::Server->new();
 
-    my $key = $req->header('Sec-WebSocket-Key');
-
-    return (
-        $req,
-        Net::WebSocket::Handshake::Server->new(
-            key => $key,
-        ),
+    my $hsk = Net::WebSocket::Handshake::Server->new(
+        extensions => [$pmd],
     );
+    for my $hname ( $req->headers()->header_field_names() ) {
+        my $value = $req->headers()->header($hname);
+        $hsk->consume_peer_header($hname => $value);
+    }
+
+    $hsk->valid_headers_or_die();
+
+    my $pmd_data = $pmd->consume_peer_extensions() && $pmd->create_data_object();
+
+    return ($req, $hsk, $pmd_data || ());
 }
 
 sub handshake_as_server {
     my ($inet, $req_handler) = @_;
 
     my $buf = q<>;
-    my ($req, $hsk);
+    my ($req, $hsk, $pmd_data);
     while ( IO::SigGuard::sysread($inet, $buf, MAX_CHUNK_SIZE, length $buf ) ) {
-        ($req, $hsk) = get_server_handshake_from_text($buf);
+        ($req, $hsk, $pmd_data) = get_server_handshake_from_text($buf);
         last if $hsk;
     }
 
@@ -57,16 +63,12 @@ sub handshake_as_server {
 
     my @extra_headers;
     if ($req_handler) {
-        $hdr_text .= $_ . CRLF for $req_handler->($req);
+        $hdr_text .= $_ . CRLF for $req_handler->($req, $hsk);
     }
-
-use Data::Dumper;
-$Data::Dumper::Useqq = 1;
-print STDERR Dumper($hdr_text);
 
     print { $inet } $hdr_text . CRLF or die "send(): $!";
 
-    return;
+    return $pmd_data;
 }
 
 use constant ERROR_SIGS => qw( INT HUP QUIT ABRT USR1 USR2 SEGV ALRM TERM );

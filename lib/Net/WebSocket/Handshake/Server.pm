@@ -55,19 +55,72 @@ use Net::WebSocket::X ();
 sub new {
     my ($class, %opts) = @_;
 
-    if (!$opts{'key'}) {
-        die Net::WebSocket::X->create('BadArg', key => $opts{'key'});
-    }
-
     return bless \%opts, $class;
 }
 
 *get_accept = __PACKAGE__->can('_get_accept');
 
+sub consume_peer_header {
+    my ($self, $name => $value) = @_;
+
+    if ($name eq 'Sec-WebSocket-Version') {
+        die "wrong version" if $value ne Net::WebSocket::Constants::PROTOCOL_VERSION(); #XXX TODO
+        $self->{'_version_ok'} = 1;
+    }
+    elsif ($name eq 'Sec-WebSocket-Key') {
+        $self->{'key'} = $value;
+    }
+    elsif ($name eq 'Sec-WebSocket-Protocol') {
+        Module::Load::load('HTTP::Headers::Util');
+
+        for my $prot_ar ( HTTP::Headers::Util::split_header_words($value) ) {
+            if (defined $prot_ar->[1]) {
+                die "Invalid Sec-WebSocket-Protocol: $value";   #XXX object TODO
+            }
+
+            if (!defined $self->{'_match_protocol'}) {
+                ($self->{'_match_protocol'}) = grep { $_ eq $prot_ar->[0] } @{ $self->{'subprotocols'} };
+            }
+        }
+    }
+    elsif ($name eq 'Sec-WebSocket-Extensions') {
+        Module::Load::load('Net::WebSocket::Handshake::Extension');
+
+        my @xtns = Net::WebSocket::Handshake::Extension->parse_string($value);
+
+        for my $handler ( @{ $self->{'extensions'} } ) {
+            $handler->consume_peer_extensions(@xtns);
+        }
+    }
+
+    return;
+}
+
+sub valid_headers_or_die {
+    my ($self) = @_;
+
+    my @needed;
+    push @needed, 'Sec-WebSocket-Version' if !$self->{'_version_ok'};
+    push @needed, 'Sec-WebSocket-Key' if !$self->{'key'};
+
+    die "Need: [@needed]" if @needed;
+
+    return;
+}
+
 sub _create_header_lines {
     my ($self) = @_;
 
     Call::Context::must_be_list();
+
+    my @prot;
+    if (exists $self->{'protocol'}) {
+        local $self->{'subprotocols'} = [ $self->{'protocol'} ];
+        @prot = $self->_encode_subprotocols();
+    }
+    else {
+        @prot = $self->_encode_subprotocols();  #XXX LEGACY/DEPRECATED
+    }
 
     return (
         'HTTP/1.1 101 Switching Protocols',
@@ -81,7 +134,7 @@ sub _create_header_lines {
 
         $self->_encode_extensions(),
 
-        $self->_encode_subprotocols(),
+        @prot,
     );
 }
 

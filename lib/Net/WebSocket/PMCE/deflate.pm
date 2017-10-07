@@ -95,7 +95,7 @@ use Net::WebSocket::Handshake::Extension ();
 use Net::WebSocket::X ();
 
 use constant {
-    TOKEN => 'permessage-deflate',
+    token => 'permessage-deflate',
 };
 
 use constant VALID_MAX_WINDOW_BITS => qw( 8 9 10 11 12 13 14 15 );
@@ -209,7 +209,7 @@ sub _create_header {
 
     Call::Context::must_be_list();
 
-    my @parts = $self->TOKEN();
+    my @parts = $self->token();
 
     if (exists $self->{'deflate_max_window_bits'}) {
         push @parts, $self->{_DEFLATE_MAX_WINDOW_BITS_PARAM()} => $self->{'deflate_max_window_bits'};
@@ -292,7 +292,7 @@ sub consume_peer_extensions {
     my ($self, @extensions) = @_;
 
     for my $ext (@extensions) {
-        next if $ext->token() ne $self->TOKEN();
+        next if $ext->token() ne $self->token();
 
         my %opts = $ext->parameters();
 
