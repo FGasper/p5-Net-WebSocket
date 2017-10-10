@@ -8,7 +8,7 @@ use Test::Exception;
 
 use constant EXT_CLASS => 'Net::WebSocket::Handshake::Extension';
 
-plan tests => 1 + 16;
+plan tests => 1 + 15;
 
 use Net::WebSocket::PMCE::deflate::Server ();
 
@@ -43,11 +43,7 @@ ok(
 
 my $pmd = Net::WebSocket::PMCE::deflate::Server->new();
 
-my $confirmed = $pmd->consume_peer_extensions(
-    EXT_CLASS->parse_string('permessage-deflate; server_no_context_takeover'),
-);
-
-ok( $confirmed, 'caught extension' );
+$pmd->consume_parameters('server_no_context_takeover' => undef );
 
 ok(
     $pmd->local_no_context_takeover(),
@@ -61,12 +57,11 @@ ok(
 
 lives_ok(
     sub {
-        $pmd->consume_peer_extensions(
-            EXT_CLASS->parse_string('some-other-extension; server_no_context_takeover'),
-            EXT_CLASS->parse_string('permessage-deflate; client_no_context_takeover'),
+        $pmd->consume_parameters(
+            client_no_context_takeover => undef
         );
     },
-    'consume_peer_extensions() works multiply (for a server)',
+    'consume_parameters() works multiply (for a server)',
 );
 
 #----------------------------------------------------------------------
@@ -74,9 +69,7 @@ lives_ok(
 {
     my $pmd = Net::WebSocket::PMCE::deflate::Server->new();
 
-    $pmd->consume_peer_extensions(
-        EXT_CLASS->parse_string('permessage-deflate; client_no_context_takeover'),
-    );
+    $pmd->consume_parameters('client_no_context_takeover' => undef);
 
     ok(
         $pmd->peer_no_context_takeover(),
@@ -105,9 +98,7 @@ lives_ok(
 
     my $pmd = Net::WebSocket::PMCE::deflate::Server->new( deflate_max_window_bits => 12 );
 
-    $pmd->consume_peer_extensions(
-        EXT_CLASS->parse_string('permessage-deflate; server_max_window_bits=11'),
-    );
+    $pmd->consume_parameters(server_max_window_bits => 11);
 
     is( $pmd->deflate_max_window_bits(), 11, 'absorb received server_max_window_bits' );
 }
@@ -133,17 +124,13 @@ lives_ok(
 
     my $pmd = Net::WebSocket::PMCE::deflate::Server->new( inflate_max_window_bits => 12 );
 
-    $pmd->consume_peer_extensions(
-        EXT_CLASS->parse_string('permessage-deflate; client_max_window_bits=11'),
-    );
+    $pmd->consume_parameters(client_max_window_bits => 11);
 
     is( $pmd->inflate_max_window_bits(), 11, 'absorb received client_max_window_bits' );
 
     $pmd = Net::WebSocket::PMCE::deflate::Server->new( inflate_max_window_bits => 12 );
 
-    $pmd->consume_peer_extensions(
-        EXT_CLASS->parse_string('permessage-deflate; server_max_window_bits=13'),
-    );
+    $pmd->consume_parameters(server_max_window_bits => 13);
 
     is( $pmd->inflate_max_window_bits(), 12, 'ignore received client_max_window_bits when greater than preset' );
 }

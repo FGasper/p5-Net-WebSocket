@@ -11,9 +11,8 @@ use Net::WebSocket::PMCE::deflate::Client ();
 my $default = Net::WebSocket::PMCE::deflate::Client->new();
 
 is_deeply(
-    [ $default->create_request_header_parts() ],
+    [ $default->get_handshake_object()->parameters() ],
     [
-        'permessage-deflate',
         'client_max_window_bits' => undef,
     ],
     'default state',
@@ -23,9 +22,7 @@ sub _get_request_hash {
     my (@params) = @_;
 
     my $obj = Net::WebSocket::PMCE::deflate::Client->new(@params);
-    my @request = $obj->create_request_header_parts();
-
-    shift @request;
+    my @request = $obj->get_handshake_object()->parameters();
 
     return { @request };
 }

@@ -11,6 +11,7 @@ use IO::SigGuard ();
 use Net::WebSocket::Handshake::Server ();
 use Net::WebSocket::Frame::close ();
 use Net::WebSocket::PMCE::deflate::Server ();
+use Net::WebSocket::HTTP_R ();
 
 use constant MAX_CHUNK_SIZE => 64000;
 
@@ -27,22 +28,15 @@ sub get_server_handshake_from_text {
 
     my $req = HTTP::Request->parse($hdrs_txt);
 
-    my $method = $req->method();
-    die "Must be GET, not “$method” ($hdrs_txt)" if $method ne 'GET';
-
     my $pmd = Net::WebSocket::PMCE::deflate::Server->new();
 
     my $hsk = Net::WebSocket::Handshake::Server->new(
         extensions => [$pmd],
     );
-    for my $hname ( $req->headers()->header_field_names() ) {
-        my $value = $req->headers()->header($hname);
-        $hsk->consume_peer_header($hname => $value);
-    }
 
-    $hsk->valid_headers_or_die();
+    Net::WebSocket::HTTP_R::handshake_consume_request( $hsk, $req );
 
-    my $pmd_data = $pmd->consume_peer_extensions() && $pmd->create_data_object();
+    my $pmd_data = $pmd->ok_to_use() && $pmd->create_data_object();
 
     return ($req, $hsk, $pmd_data || ());
 }

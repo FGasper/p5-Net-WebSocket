@@ -14,23 +14,17 @@ use constant {
     _INFLATE_MAX_WINDOW_BITS_PARAM => 'server_max_window_bits',
 };
 
-sub _create_header {
+sub _create_extension_header_parts {
     my ($self) = @_;
+
+    my @parts = $self->SUPER::_create_extension_header_parts();
 
     #Let’s always advertise support for this feature.
-    local $self->{_DEFLATE_MAX_WINDOW_BITS_PARAM()} = undef if !exists $self->{_DEFLATE_MAX_WINDOW_BITS_PARAM()};
-
-    return $self->SUPER::_create_header();
-}
-
-sub consume_peer_extensions {
-    my ($self) = @_;
-
-    if ($self->{'_use_ok'}) {
-        die 'Servers must not send multiple permessage-deflate extension headers!'
+    if (!defined $self->{'deflate_max_window_bits'}) {
+        push @parts, _DEFLATE_MAX_WINDOW_BITS_PARAM() => undef;
     }
 
-    return $self->SUPER::consume_peer_extensions( @_[ 1 .. $#_ ] );
+    return @parts;
 }
 
 sub _consume_extension_options {

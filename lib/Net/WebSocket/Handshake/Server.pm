@@ -10,21 +10,21 @@ Net::WebSocket::Handshake::Server
 
     my $hsk = Net::WebSocket::Handshake::Server->new(
 
-        #required, base 64
-        key => '..',
-
         #optional
         subprotocols => [ 'echo', 'haha' ],
 
-        #optional, instances of Net::WebSocket::Handshake::Extension
+        #optional; see below for the interface that these objects
+        #need to expose.
         extensions => \@extension_objects,
     );
+
+    $hsk->valid_method_or_die( $http_method );  #optional
+
+    $hsk->consume_peer_headers(@headers_kv_pairs);
 
     #Note the need to conclude the header text manually.
     #This is by design, so you can add additional headers.
     my $resp_hdr = $hsk->create_header_text() . "\x0d\x0a";
-
-    my $b64 = $hsk->get_accept();
 
 =head1 DESCRIPTION
 
@@ -40,66 +40,113 @@ B<NOTE:> C<create_header_text()> does NOT provide the extra trailing
 CRLF to conclude the HTTP headers. This allows you to add additional
 headers beyond what this class gives you.
 
+=head1 EXTENSION CLASSES
+
+This class uses the following methods of the objects of the
+C<extensions> array:
+
+
+
+=head1 LEGACY INTERFACE
+
+Prior to version 0.5 this module was a great deal less “helpful”:
+it required callers to parse out and write WebSocket headers,
+doing most of the validation manually. Version 0.5 added a generic
+interface for entering in HTTP headers, which allows Net::WebSocket to
+handle the parsing and creation of HTTP headers.
+
+For now the legacy functionality is being left in; however,
+it is considered DEPRECATED and will be removed eventually.
+
+    my $hsk = Net::WebSocket::Handshake::Server->new(
+
+        #base 64
+        key => '..',
+
+        #optional - same as in non-legacy interface
+        subprotocols => [ 'echo', 'haha' ],
+
+        #optional, instances of Net::WebSocket::Handshake::Extension
+        extensions => \@extension_objects,
+    );
+
+    #Use this to write out the Sec-WebSocket-Accept header.
+    my $b64 = $hsk->get_accept();
+
 =cut
 
 use strict;
 use warnings;
 
-use parent qw( Net::WebSocket::Handshake::Base );
+use parent qw( Net::WebSocket::Handshake );
 
 use Call::Context ();
 use Digest::SHA ();
 
+use Net::WebSocket::Constants ();
 use Net::WebSocket::X ();
 
-sub new {
-    my ($class, %opts) = @_;
+sub valid_method_or_die {
+    my ($self, $method) = @_;
 
-    return bless \%opts, $class;
+    if ($method ne Net::WebSocket::Constants::REQUIRED_HTTP_METHOD()) {
+        die Net::WebSocket::X->new('BadHTTPMethod', $method);
+    }
+
+    return;
 }
 
 *get_accept = __PACKAGE__->can('_get_accept');
 
-sub consume_peer_header {
+sub _consume_peer_header {
     my ($self, $name => $value) = @_;
 
     if ($name eq 'Sec-WebSocket-Version') {
-        die "wrong version" if $value ne Net::WebSocket::Constants::PROTOCOL_VERSION(); #XXX TODO
+        if ( $value ne Net::WebSocket::Constants::PROTOCOL_VERSION() ) {
+            die Net::WebSocket::X->new('BadHeader', 'Sec-WebSocket-Version', $value, 'Unsupported protocol version; must be ' . Net::WebSocket::Constants::PROTOCOL_VERSION());
+        }
+
         $self->{'_version_ok'} = 1;
     }
     elsif ($name eq 'Sec-WebSocket-Key') {
         $self->{'key'} = $value;
     }
     elsif ($name eq 'Sec-WebSocket-Protocol') {
-        Module::Load::load('HTTP::Headers::Util');
+        Module::Load::load('Net::WebSocket::HTTP');
 
-        for my $prot_ar ( HTTP::Headers::Util::split_header_words($value) ) {
-            if (defined $prot_ar->[1]) {
-                die "Invalid Sec-WebSocket-Protocol: $value";   #XXX object TODO
-            }
-
+        for my $token ( Net::WebSocket::HTTP::split_tokens($value) ) {
             if (!defined $self->{'_match_protocol'}) {
-                ($self->{'_match_protocol'}) = grep { $_ eq $prot_ar->[0] } @{ $self->{'subprotocols'} };
+                ($self->{'_match_protocol'}) = grep { $_ eq $token } @{ $self->{'subprotocols'} };
             }
         }
     }
-    elsif ($name eq 'Sec-WebSocket-Extensions') {
-        Module::Load::load('Net::WebSocket::Handshake::Extension');
-
-        my @xtns = Net::WebSocket::Handshake::Extension->parse_string($value);
-
-        for my $handler ( @{ $self->{'extensions'} } ) {
-            $handler->consume_peer_extensions(@xtns);
-        }
+    else {
+        $self->_consume_generic_header($name => $value);
     }
 
     return;
 }
 
-sub valid_headers_or_die {
+#Send only those extensions that we’ve deduced the client can actually use.
+sub _should_include_extension_in_headers {
+    my ($self, $xtn) = @_;
+
+    return $xtn->ok_to_use();
+}
+
+sub _encode_subprotocols {
     my ($self) = @_;
 
-    my @needed;
+    local $self->{'subprotocols'} = [ defined ($self->{'_match_protocol'}) ? $self->{'_match_protocol'} : () ] if !$self->{'_no_use_legacy'};
+
+    return $self->SUPER::_encode_subprotocols();
+}
+
+sub _valid_headers_or_die {
+    my ($self) = @_;
+
+    my @needed = $self->_missing_generic_headers();
+
     push @needed, 'Sec-WebSocket-Version' if !$self->{'_version_ok'};
     push @needed, 'Sec-WebSocket-Key' if !$self->{'key'};
 
@@ -113,15 +160,6 @@ sub _create_header_lines {
 
     Call::Context::must_be_list();
 
-    my @prot;
-    if (exists $self->{'protocol'}) {
-        local $self->{'subprotocols'} = [ $self->{'protocol'} ];
-        @prot = $self->_encode_subprotocols();
-    }
-    else {
-        @prot = $self->_encode_subprotocols();  #XXX LEGACY/DEPRECATED
-    }
-
     return (
         'HTTP/1.1 101 Switching Protocols',
 
@@ -132,10 +170,12 @@ sub _create_header_lines {
 
         'Sec-WebSocket-Accept: ' . $self->get_accept(),
 
-        $self->_encode_extensions(),
+        $self->_encode_subprotocols(),
 
-        @prot,
+        $self->_encode_extensions(),
     );
 }
+
+use constant _handle_unrecognized_extension => ();
 
 1;

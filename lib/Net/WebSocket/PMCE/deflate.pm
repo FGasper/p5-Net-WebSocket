@@ -68,9 +68,6 @@ Net::WebSocket::PMCE::deflate - WebSocket’s C<permessage-deflate> extension
 This class implements C<permessage-deflate> as defined in
 L<RFC 7692|https://tools.ietf.org/html/rfc7692>.
 
-If you want a base class to use to implement other per-message compress
-extensions (PMCEs), look at L<Net::WebSocket::PMCE>.
-
 =head1 STATUS
 
 This module is an ALPHA release. Changes to the API are not unlikely;
@@ -100,27 +97,6 @@ use constant {
 
 use constant VALID_MAX_WINDOW_BITS => qw( 8 9 10 11 12 13 14 15 );
 
-#=head2 validate_max_window_bits( BITS )
-#
-#This validates a value given in either the C<server_max_window_bits>
-#or C<client_max_window_bits> handshake parameters. This function considers an
-#undefined value to be an error, so you need to check
-#whether C<client_max_window_bits> was given with a value or not.
-#
-#=cut
-#
-#sub validate_max_window_bits {
-#    my ($bits) = @_;
-#
-#    if (defined $bits) {
-#        return if grep { $_ eq $bits } @VALID_MAX_WINDOW_BITS;
-#
-#        die Net::WebSocket::X->create( 'BadArg', "Must be one of: [@VALID_MAX_WINDOW_BITS]" );
-#    }
-#
-#    die Net::WebSocket::X->create( 'BadArg', "Must have a value, one of: [@VALID_MAX_WINDOW_BITS]" );
-#}
-
 =head1 METHODS
 
 This class inherits all methods from L<Net::WebSocket::PMCE> and adds
@@ -134,8 +110,8 @@ C<%OPTS> is:
 
 =over
 
-=item C<deflate_max_window_bits> - optional; the number of window bits to use
-for compressing messages.
+=item C<deflate_max_window_bits> - optional; the maximum number of window bits
+that this endpoint will use to compress messages.
 
 =item C<inflate_max_window_bits> - optional; the number of window bits to use
 for decompressing messages.
@@ -148,6 +124,10 @@ use context takeover when it compresses messages.
 
 =back
 
+Note the distinction between permessage-deflate’s
+C<client_max_window_bits>/C<server_max_window_bits> settings and this
+class’s C<deflate_max_window_bits>/C<inflate_max_window_bits> options.
+
 =cut
 
 sub new {
@@ -159,11 +139,25 @@ sub new {
     return bless \%opts, $class;
 }
 
+=head2 I<OBJ>->deflate_max_window_bits()
+
+The effective value of this setting. If unspecified or if the peer doesn’t
+support this feature, the value will be the RFC’s default value.
+
+=cut
+
 sub deflate_max_window_bits {
     my ($self) = @_;
 
     return $self->{'deflate_max_window_bits'} || ( $self->VALID_MAX_WINDOW_BITS() )[-1];
 }
+
+=head2 I<OBJ>->inflate_max_window_bits()
+
+The effective value of this setting. If unspecified or if the peer doesn’t
+support this feature, the value will be the RFC’s default value.
+
+=cut
 
 sub inflate_max_window_bits {
     my ($self) = @_;
@@ -198,39 +192,13 @@ sub get_handshake_object {
     my ($self) = @_;
 
     return Net::WebSocket::Handshake::Extension->new(
-        $self->_create_header(),
+        $self->_create_extension_header_parts(),
     );
 }
 
 #----------------------------------------------------------------------
 
-sub _create_header {
-    my ($self) = @_;
-
-    Call::Context::must_be_list();
-
-    my @parts = $self->token();
-
-    if (exists $self->{'deflate_max_window_bits'}) {
-        push @parts, $self->{_DEFLATE_MAX_WINDOW_BITS_PARAM()} => $self->{'deflate_max_window_bits'};
-    }
-
-    if (exists $self->{'inflate_max_window_bits'}) {
-        push @parts, $self->{_INFLATE_MAX_WINDOW_BITS_PARAM()} => $self->{'inflate_max_window_bits'};
-    }
-
-    if ($self->{'local_no_context_takeover'}) {
-        push @parts, $self->{_LOCAL_NO_CONTEXT_TAKEOVER_PARAM()} => undef;
-    }
-    if ($self->{'peer_no_context_takeover'}) {
-        push @parts, $self->{_PEER_NO_CONTEXT_TAKEOVER_PARAM()} => undef;
-    }
-
-    return @parts;
-}
-
-
-=head2 I<OBJ>->consume_peer_extensions( EXTENSIONS )
+=head2 I<OBJ>->consume_parameters( KEY1 => VALUE1, .. )
 
 Alters the given object as per the peer’s request. Ordinarily
 this should be fine, but if for some reason you want to reject the peer’s
@@ -288,26 +256,30 @@ new value.
 
 =cut
 
-sub consume_peer_extensions {
-    my ($self, @extensions) = @_;
+sub consume_parameters {
+    my ($self, @params) = @_;
 
-    for my $ext (@extensions) {
-        next if $ext->token() ne $self->token();
+    my %opts = @params;
 
-        my %opts = $ext->parameters();
+    $self->_consume_extension_options(\%opts);
 
-        $self->_consume_extension_options(\%opts);
-
-        if (%opts) {
-            my ($token, @params) = ($ext->token(), %opts);
-            die "Unrecognized for “$token”: @params";
-        }
-
-        $self->{'_use_ok'}++;
+    if (%opts) {
+        my $token = $self->token();
+        die "Unrecognized for “$token”: @params";
     }
 
-    return $self->{'_use_ok'};
+    $self->{'_use_ok'}++;
+
+    return;
 }
+
+sub ok_to_use {
+    my ($self) = @_;
+
+    return !!$self->{'_use_ok'};
+}
+
+#----------------------------------------------------------------------
 
 # 7. .. A server MUST decline an extension negotiation offer for this
 # extension if any of the following conditions are met:
@@ -384,6 +356,29 @@ sub __validate_max_window_bits {
     }
 
     return Net::WebSocket::X->create( 'BadArg', "${ept}_max_window_bits" => $bits, "Must be one of: [@VALID_MAX_WINDOW_BITS]" );
+}
+
+sub _create_extension_header_parts {
+    my ($self) = @_;
+
+    my @parts = $self->token();
+
+    if (defined $self->{'deflate_max_window_bits'}) {
+        push @parts, $self->_DEFLATE_MAX_WINDOW_BITS_PARAM() => $self->{'deflate_max_window_bits'};
+    }
+
+    if (defined $self->{'inflate_max_window_bits'}) {
+        push @parts, $self->_INFLATE_MAX_WINDOW_BITS_PARAM() => $self->{'inflate_max_window_bits'};
+    }
+
+    if ($self->{'local_no_context_takeover'}) {
+        push @parts, $self->_LOCAL_NO_CONTEXT_TAKEOVER_PARAM() => undef;
+    }
+    if ($self->{'peer_no_context_takeover'}) {
+        push @parts, $self->_PEER_NO_CONTEXT_TAKEOVER_PARAM() => undef;
+    }
+
+    return @parts;
 }
 
 #----------------------------------------------------------------------

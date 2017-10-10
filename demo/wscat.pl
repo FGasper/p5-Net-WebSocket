@@ -27,6 +27,8 @@ use Net::WebSocket::Parser ();
 
 use Net::WebSocket::PMCE::deflate::Client ();
 
+use Net::WebSocket::HTTP_R ();
+
 use constant {
     MAX_CHUNK_SIZE => 64000,
     CRLF => "\x0d\x0a",
@@ -128,14 +130,12 @@ sub run {
 
             $handshake = Net::WebSocket::Handshake::Client->new(
                 uri => $uri,
+                extensions => [$deflate],
             );
 
             my $hdr = $handshake->create_header_text();
-            $hdr .= 'Sec-WebSocket-Extensions: ' . $deflate_hsk->to_string() . CRLF;
+print "SENDING HEADERS:\n$hdr\n";
 
-use Data::Dumper;
-$Data::Dumper::Useqq = 1;
-print STDERR Dumper(sending => $hdr);
             $self->write( $hdr . CRLF );
 
             $sent_handshake = 1;
@@ -154,33 +154,15 @@ print STDERR Dumper(sending => $hdr);
 
                 my $hdrs_txt = $read_obj->read( $idx + 2 * length(CRLF) );
 
-                my $req = HTTP::Response->parse($hdrs_txt);
+print "HEADERS:\n$hdrs_txt\n";
+                my $resp = HTTP::Response->parse($hdrs_txt);
 
-                my $code = $req->code();
-                die "Must be 101, not “$code”" if $code != 101;
+                Net::WebSocket::HTTP_R::handshake_consume_response(
+                    $handshake,
+                    $resp,
+                );
 
-                my $upg = $req->header('upgrade');
-                $upg =~ tr<A-Z><a-z>;
-                die "“Upgrade” must be “websocket”, not “$upg”!" if $upg ne 'websocket';
-
-                my $conn = $req->header('connection');
-                $conn =~ tr<A-Z><a-z>;
-                die "“Upgrade” must be “upgrade”, not “$conn”!" if $conn ne 'upgrade';
-
-                my $accept = $req->header('Sec-WebSocket-Accept');
-                $handshake->validate_accept_or_die($accept);
-
-                #--------------
-                my $exts = $req->header('Sec-WebSocket-Extensions');
-
-                #a list of strings
-                my @extensions = ref($exts) ? @$exts : ($exts);
-
-                #now it’s a list of objects
-                @extensions = map { Net::WebSocket::Handshake::Extension->parse_string($_) } @extensions;
-                #--------------
-
-                if ( $deflate->consume_peer_extensions(@extensions) ) {
+                if ( $deflate->ok_to_use() ) {
                     $deflate_data = $deflate->create_data_object();
                 }
 
@@ -230,7 +212,6 @@ print STDERR Dumper(sending => $hdr);
                     mask => Net::WebSocket::Mask::create(),
                 );
             }
-print STDERR Dumper($frame);
 
             $handle->write($frame->to_bytes());
         },

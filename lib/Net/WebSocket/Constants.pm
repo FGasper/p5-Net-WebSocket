@@ -12,7 +12,11 @@ use constant OPCODE => {
     pong => 10,
 };
 
-use constant PROTOCOL_VERSION => 13;
+use constant {
+    PROTOCOL_VERSION => 13,
+    REQUIRED_HTTP_METHOD => 'GET',
+    REQUIRED_HTTP_STATUS => 101,
+};
 
 #These names are taken from:
 #https://msdn.microsoft.com/en-us/library/windows/desktop/hh449350(v=vs.85).aspx

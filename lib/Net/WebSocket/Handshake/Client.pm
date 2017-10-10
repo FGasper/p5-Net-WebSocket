@@ -54,12 +54,17 @@ headers beyond what this class gives you.
 use strict;
 use warnings;
 
-use parent qw( Net::WebSocket::Handshake::Base );
+use parent qw( Net::WebSocket::Handshake );
 
 use URI::Split ();
 
 use Net::WebSocket::Constants ();
 use Net::WebSocket::X ();
+
+use constant SCHEMAS => (
+    'ws', 'wss',
+    'http', 'https',
+);
 
 sub new {
     my ($class, %opts) = @_;
@@ -68,11 +73,11 @@ sub new {
         @opts{ 'uri_schema', 'uri_auth', 'uri_path', 'uri_query' } = URI::Split::uri_split($opts{'uri'});
     }
 
-    if (!$opts{'uri_schema'} || ($opts{'uri_schema'} !~ m<\A(?:ws|http)s?\z>)) {
+    if (!$opts{'uri_schema'} || !grep { $_ eq $opts{'uri_schema'} } SCHEMAS()) {
         die Net::WebSocket::X->create('BadArg', uri => $opts{'uri'});
     }
 
-    if (!$opts{'uri_auth'}) {
+    if (!length $opts{'uri_auth'}) {
         die Net::WebSocket::X->create('BadArg', uri => $opts{'uri'});
     }
 
@@ -80,53 +85,39 @@ sub new {
 
     $opts{'key'} ||= _create_key();
 
-    if ($opts{'extensions'}) {
-        $opts{'_request_extension_tokens'} = [ map { $_->token() } @{ $opts{'extensions'} } ];
-    }
-
-    return bless \%opts, $class;
+    return $class->SUPER::new(%opts);
 }
 
-sub consume_peer_header {
-    my ($self, $name => $value) = @_;
+sub valid_status_or_die {
+    my ($self, $code, $reason) = @_;
 
-    if ($name eq 'Sec-WebSocket-Accept') {
-        $self->validate_accept_or_die($value);
-    }
-    elsif ($name eq 'Sec-WebSocket-Protocol') {
-        if (exists $self->{'_peer_protocol'}) {
-            die 'Already got Sec-WebSocket-Protocol!';  #XXX object TODO
-        }
-
-        Module::Load::load('HTTP::Headers::Util');
-
-        my @split = HTTP::Headers::Util::split_header_words($value);
-        if ((@split > 1) || defined $split[0][1]) {
-            die "Invalid Sec-WebSocket-Protocol: $value";   #XXX object TODO
-        }
-
-        $self->{'_peer_protocol'} = $value;
-    }
-    elsif ($name eq 'Sec-WebSocket-Extensions') {
-        Module::Load::load('Net::WebSocket::Handshake::Extension');
-
-        for my $ext ( Net::WebSocket::Handshake::Extension->parse_string($value) ) {
-            if (!grep { $_ eq $ext->token() } @{ $opts{'_request_extension_tokens'} }) {
-                die "Received invalid extension: $value";   #XXX object TODO
-            }
-
-            push @{ $self->{'_peer_extensions'} }, $ext;
-        }
+    if ($code ne Net::WebSocket::Constants::REQUIRED_HTTP_STATUS()) {
+        die Net::WebSocket::X->create('BadHTTPStatus', $code, $reason);
     }
 
     return;
 }
 
-sub get_peer_protocol {
-    my $self = shift;
+sub get_key {
+    my ($self) = @_;
 
-    return $self->{'_peer_protocol'};
+    return $self->{'key'};
 }
+
+#----------------------------------------------------------------------
+#Legacy:
+
+sub validate_accept_or_die {
+    my ($self, $received) = @_;
+
+    my $should_be = $self->_get_accept();
+
+    return if $received eq $should_be;
+
+    die Net::WebSocket::X->create('BadAccept', $should_be, $received );
+}
+
+#----------------------------------------------------------------------
 
 sub _create_header_lines {
     my ($self) = @_;
@@ -161,25 +152,79 @@ sub _create_header_lines {
     );
 }
 
-sub validate_accept_or_die {
-    my ($self, $received) = @_;
-
-    my $should_be = $self->_get_accept();
-
-    return if $received eq $should_be;
-
-    die Net::WebSocket::X->create('BadAccept', $should_be, $received );
-}
-
-sub get_key {
+sub _valid_headers_or_die {
     my ($self) = @_;
 
-    return $self->{'key'};
+    my @needed = $self->_missing_generic_headers();
+    push @needed, 'Sec-WebSocket-Accept' if !$self->{'_accept_header_ok'};
+
+    if (@needed) {
+        die Net::WebSocket::X->create('MissingHeaders', @needed);
+    }
+
+    return;
 }
+
+sub _consume_peer_header {
+    my ($self, $name => $value) = @_;
+
+    for my $hdr_part ( qw( Accept Protocol Extensions ) ) {
+        if ($name eq "Sec-WebSocket-$hdr_part") {
+            if ( $self->{"_got_$name"} ) {
+                die Net::WebSocket::X->create('BadHeader', $name, $value, 'duplicate');    #XXX TODO - specific?
+            }
+
+            $self->{"_got_$name"}++;
+        }
+    }
+
+    if ($name eq 'Sec-WebSocket-Accept') {
+        $self->validate_accept_or_die($value);
+        $self->{'_accept_header_ok'} = 1;
+    }
+    elsif ($name eq 'Sec-WebSocket-Protocol') {
+        if (!grep { $_ eq $value } @{ $self->{'subprotocols'} }) {
+            die Net::WebSocket::X->create('BadHeader', $name, $value, 'Unrecognized subprotocol'); #XXX TODO - specific?
+        }
+
+        $self->{'_subprotocol'} = $value;
+    }
+    else {
+        $self->_consume_generic_header($name => $value);
+    }
+
+    return;
+}
+
+sub _validate_received_protocol {
+    my ($self, $value) = @_;
+
+    Module::Load::load('Net::WebSocket::HTTP');
+
+    my @split = Net::WebSocket::HTTP::split_tokens($value);
+    if (@split > 1) {
+        die Net::WebSocket::X->new('BadHeader', 'Sec-WebSocket-Protocol', $value);
+    }
+
+    if (!grep { $value eq $_ } @{ $self->{'subprotocols'} }) {
+        die "Unrecognized subprotocol: “$value”";   #TODO XXX
+    }
+
+    return;
+}
+
+sub _handle_unrecognized_extension {
+    my ($self, $xtn_obj) = @_;
+
+    die "Unrecognized extension: " . $xtn_obj->to_string(); #XXX TODO
+}
+
 
 sub _create_key {
     Module::Load::load('MIME::Base64') if !MIME::Base64->can('encode');
 
+    #NB: Not cryptographically secure, but it should be good enough
+    #for the purpose of a nonce.
     my $sixteen_bytes = pack 'S8', map { rand 65536 } 1 .. 8;
 
     my $b64 = MIME::Base64::encode_base64($sixteen_bytes);
@@ -187,5 +232,8 @@ sub _create_key {
 
     return $b64;
 }
+
+#Send all extensions to the server in the request.
+use constant _should_include_extension_in_headers => 1;
 
 1;
