@@ -44,15 +44,15 @@ that stand for subprotocols that this endpoint can use via the WebSocket
 connection.
 
 =item * C<extensions> - A list of extension objects that the Handshake
-object will interact with to determine extension support. Each extension
-object must implement the following methods:
+object will interact with to determine extension support.
+
+=head1 COMMON EXTENSION INTERFACE
+
+Each object in the C<extensions> array must implement the following methods:
 
 =over
 
 =item * C<token()> The extension’s token. (e.g., C<permessage-deflate>)
-
-=item * C<ok_to_use()> A boolean that indicates whether the peer indicates
-proper support for the extension.
 
 =item * C<get_handshake_object()> Returns an instance of
 L<Net::WebSocket::Handshake::Extension> to represent the extension and
@@ -62,6 +62,10 @@ its parameters in the HTTP headers.
 (in the format that C<Net::WebSocket::Handshake::Extension::parameters()>
 returns). This operation should configure the object to return the proper
 value from its C<ok_to_use()> method.
+
+=item * C<ok_to_use()> A boolean that indicates whether the peer indicates
+proper support for the extension. This should not be called until after
+C<consume_parameters().
 
 =back
 

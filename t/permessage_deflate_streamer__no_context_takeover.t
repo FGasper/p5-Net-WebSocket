@@ -9,7 +9,7 @@ use Net::WebSocket::PMCE::deflate ();
 use Net::WebSocket::PMCE::deflate::Streamer::Server ();
 
 my $deflate = Net::WebSocket::PMCE::deflate->new(
-    'local_no_context_takeover' => 1,
+    'deflate_no_context_takeover' => 1,
 );
 
 my $streamer = Net::WebSocket::PMCE::deflate::Streamer::Server->new('text', $deflate);
@@ -44,7 +44,7 @@ TODO: {
     is(
         $msg2->get_payload(),
         $msg->get_payload(),
-        'with “local_no_context_takeover” two identical successive messages compress the same (i.e., context is reset)',
+        'with “deflate_no_context_takeover” two identical successive messages compress the same (i.e., context is reset)',
     ) or do {
         diag( sprintf "%v.02x\n", $_ ) for map { $_->get_payload() } @frames, @frames2;
     };

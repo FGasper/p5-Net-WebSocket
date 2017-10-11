@@ -30,13 +30,13 @@ is(
 );
 
 ok(
-    !$default->local_no_context_takeover(),
-    'local_no_context_takeover() default = off',
+    !$default->deflate_no_context_takeover(),
+    'deflate_no_context_takeover() default = off',
 );
 
 ok(
-    !$default->peer_no_context_takeover(),
-    'peer_no_context_takeover() default = off',
+    !$default->inflate_no_context_takeover(),
+    'inflate_no_context_takeover() default = off',
 );
 
 #----------------------------------------------------------------------
@@ -46,13 +46,13 @@ my $pmd = Net::WebSocket::PMCE::deflate::Server->new();
 $pmd->consume_parameters('server_no_context_takeover' => undef );
 
 ok(
-    $pmd->local_no_context_takeover(),
-    'local_no_context_takeover() after parsing extension string',
+    $pmd->deflate_no_context_takeover(),
+    'deflate_no_context_takeover() after parsing extension string',
 );
 
 ok(
-    !$pmd->peer_no_context_takeover(),
-    'peer_no_context_takeover() default = off',
+    !$pmd->inflate_no_context_takeover(),
+    'inflate_no_context_takeover() default = off',
 );
 
 lives_ok(
@@ -72,8 +72,8 @@ lives_ok(
     $pmd->consume_parameters('client_no_context_takeover' => undef);
 
     ok(
-        $pmd->peer_no_context_takeover(),
-        'peer_no_context_takeover() default = off',
+        $pmd->inflate_no_context_takeover(),
+        'inflate_no_context_takeover() default = off',
     );
 }
 

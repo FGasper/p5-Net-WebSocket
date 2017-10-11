@@ -30,13 +30,13 @@ is(
 );
 
 ok(
-    !$default->local_no_context_takeover(),
-    'local_no_context_takeover() default = off',
+    !$default->deflate_no_context_takeover(),
+    'deflate_no_context_takeover() default = off',
 );
 
 ok(
-    !$default->peer_no_context_takeover(),
-    'peer_no_context_takeover() default = off',
+    !$default->inflate_no_context_takeover(),
+    'inflate_no_context_takeover() default = off',
 );
 
 #----------------------------------------------------------------------
@@ -48,13 +48,13 @@ $pmd->consume_parameters(
 );
 
 ok(
-    $pmd->local_no_context_takeover(),
-    'local_no_context_takeover() after parsing extension string',
+    $pmd->deflate_no_context_takeover(),
+    'deflate_no_context_takeover() after parsing extension string',
 );
 
 ok(
-    !$pmd->peer_no_context_takeover(),
-    'peer_no_context_takeover() default = off',
+    !$pmd->inflate_no_context_takeover(),
+    'inflate_no_context_takeover() default = off',
 );
 
 #Catch this in Net::WebSocket::Handshake instead.
@@ -70,22 +70,22 @@ ok(
 #----------------------------------------------------------------------
 #server_no_context_takeover
 {
-    my $pmd = Net::WebSocket::PMCE::deflate::Client->new( peer_no_context_takeover => 1 );
+    my $pmd = Net::WebSocket::PMCE::deflate::Client->new( inflate_no_context_takeover => 1 );
 
     dies_ok(
         sub {
             $pmd->consume_parameters();
         },
-        'peer_no_context_takeover - dies when !received server_no_context_takeover',
+        'inflate_no_context_takeover - dies when !received server_no_context_takeover',
     );
 
-    $pmd = Net::WebSocket::PMCE::deflate::Client->new( peer_no_context_takeover => 1 );
+    $pmd = Net::WebSocket::PMCE::deflate::Client->new( inflate_no_context_takeover => 1 );
 
     lives_ok(
         sub {
             $pmd->consume_parameters('server_no_context_takeover' => undef);
         },
-        'peer_no_context_takeover - OK when received server_no_context_takeover',
+        'inflate_no_context_takeover - OK when received server_no_context_takeover',
     );
 }
 

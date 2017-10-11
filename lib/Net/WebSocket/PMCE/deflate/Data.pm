@@ -30,7 +30,7 @@ for decompressing messages. This should correspond with the remote peer’s
 behavior; i.e., for a server, this should match the C<client_max_window_bits>
 extension parameter in the WebSocket handshake.
 
-=item C<local_no_context_takeover> - corresponds to either the
+=item C<deflate_no_context_takeover> - corresponds to either the
 C<client_no_context_takeover> or C<server_no_context_takeover> parameter,
 to match the local endpoint’s role. When this flag is set, the object
 will do a full flush at the end of each C<compress()> call.
@@ -45,7 +45,7 @@ sub new {
     #Validate deflate_max_window_bits/inflate_max_window_bits?
 
     my $compress_func = '_compress_';
-    $compress_func .= $opts{'local_no_context_takeover'} ? 'full' : 'sync';
+    $compress_func .= $opts{'deflate_no_context_takeover'} ? 'full' : 'sync';
     $compress_func .= '_flush_chomp';
 
     $opts{'final_frame_compress_func'} = $compress_func;
@@ -84,7 +84,7 @@ sub create_message {
 
 #----------------------------------------------------------------------
 
-=head2 $msg = I<OBJ>->create_message( FRAME_CLASS )
+=head2 $msg = I<OBJ>->create_streamer( FRAME_CLASS )
 
 Returns an instance of L<Net::WebSocket::PMCE::deflate::Streamer> based
 on this object.
@@ -133,8 +133,8 @@ my $_payload_sr;
 
 #cf. RFC 7692, 7.2.1
 #Use for fragments.
-sub _compress_sync_flush {
-    return $_[0]->_compress( $_[1], Compress::Raw::Zlib::Z_SYNC_FLUSH() );
+sub _compress_fragment {
+    return $_[0]->_compress( $_[1] );
 }
 
 #Preserves sliding window to the next message.
@@ -176,10 +176,12 @@ sub _compress {
 
     _DEBUG && _debug(sprintf "post-deflate output: [%v.02x]", $out);
 
-    $dstatus = $self->{'d'}->flush($out, $_[2]);
-    die "deflate flush: $dstatus" if $dstatus != Compress::Raw::Zlib::Z_OK();
+    if ($_[2]) {
+        $dstatus = $self->{'d'}->flush($out, $_[2]);
+        die "deflate flush: $dstatus" if $dstatus != Compress::Raw::Zlib::Z_OK();
 
-    _DEBUG && _debug(sprintf "post-flush output: [%v.02x]", $out);
+        _DEBUG && _debug(sprintf "post-flush output: [%v.02x]", $out);
+    }
 
     #NB: The RFC directs at this point that:
     #

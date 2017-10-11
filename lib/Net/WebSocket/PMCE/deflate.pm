@@ -1,51 +1,5 @@
 package Net::WebSocket::PMCE::deflate;
 
-#----------------------------------------------------------------------
-# PMCEs work only at the level of the *message*. (6.1 & 6.2) Fragmentation
-# happens within the confines of the PMCE; however, permessage-deflate
-# also describes:
-#
-#   Even when only part of the payload is available, a fragment can be
-#   built by compressing the available data and choosing the block type
-#   appropriately so that the end of the resulting compressed data is
-#   aligned at a byte boundary.  Note that for non-final fragments, the
-#   removal of 0x00 0x00 0xff 0xff MUST NOT be done. (7.2.1)
-#
-# So, we have two workflows:
-#
-#   1) Take a message payload and construct a compressed message.
-#
-#   2) Take a message fragment and build a frame for it, distinguishing
-#      between final and non-final fragments.
-#
-# For #2 we should *always* preserve a sliding window until the final
-# fragment, as the spec mandates assembly of the entire message payload
-# prior to decompression.
-#
-#----------------------------------------------------------------------
-# The original idea here was to apply DEFLATE to frames and messages
-# that are already assembled. Probably a better approach is to subclass
-# the text, binary, and continuation frame objects to apply DEFLATE
-# right away.
-#
-# The reason for this is that the RFC appears to assume that we
-# assemble frames with an awareness of the compression.
-#
-# Note in particular that (7.2.1):
-# for non-final fragments, the removal of 0x00 0x00 0xff 0xff MUST NOT be done
-#
-# In fact, the DEFLATE is apparently meant only to apply to creation of a
-# *message*. That’s potentially useful: maybe a factory?
-#
-# Need to learn more about how DEFLATE works before working more on this.
-# And/or, look at other implementations. For example, how do they handle
-# fragmentation? Something like:
-#
-# $deflate->compress(
-#
-# my $msg_iter = $deflate->start_message(
-#----------------------------------------------------------------------
-
 =encoding utf-8
 
 =head1 NAME
@@ -54,19 +8,14 @@ Net::WebSocket::PMCE::deflate - WebSocket’s C<permessage-deflate> extension
 
 =head1 SYNOPSIS
 
-    use Net::WebSocket::PMCE::deflate ();
-
-    my $deflate = Net::WebSocket::PMCE::deflate->new( ... );
-
-    my $decompressed = $pmce->inflate($payload);
-
-    #NB: a static function!
-    Net::WebSocket::PMCE::deflate::validate_max_window_bits($bits);
+See L<Net::WebSocket::PMCE::deflate::Server> or
+L<Net::WebSocket::PMCE::deflate::Client> for usage examples.
 
 =head1 DESCRIPTION
 
 This class implements C<permessage-deflate> as defined in
-L<RFC 7692|https://tools.ietf.org/html/rfc7692>.
+L<RFC 7692|https://tools.ietf.org/html/rfc7692>. This is a base class,
+not to be instantiated directly.
 
 =head1 STATUS
 
@@ -74,16 +23,10 @@ This module is an ALPHA release. Changes to the API are not unlikely;
 be sure to check the changelog before updating, and please report any
 issues you find.
 
-=head1 STATIC FUNCTIONS
-
 =cut
 
 use strict;
 use warnings;
-
-use parent 'Net::WebSocket::PMCE';
-
-use Carp::Always;
 
 use Call::Context ();
 use Module::Load ();
@@ -95,12 +38,9 @@ use constant {
     token => 'permessage-deflate',
 };
 
-use constant VALID_MAX_WINDOW_BITS => qw( 8 9 10 11 12 13 14 15 );
+use constant VALID_MAX_WINDOW_BITS => ( 8 .. 15 );
 
 =head1 METHODS
-
-This class inherits all methods from L<Net::WebSocket::PMCE> and adds
-a few more:
 
 =head2 I<CLASS>->new( %OPTS )
 
@@ -111,22 +51,51 @@ C<%OPTS> is:
 =over
 
 =item C<deflate_max_window_bits> - optional; the maximum number of window bits
-that this endpoint will use to compress messages.
+that this endpoint will use to compress messages. See C<client_max_window_bits>
+in L<RFC 7692|https://tools.ietf.org/html/rfc7692> for valid values.
 
 =item C<inflate_max_window_bits> - optional; the number of window bits to use
-for decompressing messages.
+to decompress messages. Valid values are the same as for
+C<deflate_max_window_bits>.
 
-=item C<local_no_context_takeover> - boolean; when this flag is set, the Data
-object will do a full flush at the end of each C<compress()> call.
+=item C<deflate_no_context_takeover> - boolean; whether the compressor
+will forgo context takeover. (See below.)
 
-=item C<peer_no_context_takeover> - boolean; whether to ask the peer not to
-use context takeover when it compresses messages.
+=item C<inflate_no_context_takeover> - boolean; whether the decompressor
+can forgo context takeover.
 
 =back
 
-Note the distinction between permessage-deflate’s
-C<client_max_window_bits>/C<server_max_window_bits> settings and this
-class’s C<deflate_max_window_bits>/C<inflate_max_window_bits> options.
+This interface uses C<deflate_*>/C<inflate_*> prefixes rather than
+C<client_*>/C<server_*> as the RFC uses because the module author
+has found C<deflate_*>/C<inflate_*> easier to conceptualize.
+
+=head1 CONTEXT TAKEOVER: THE MISSING EXPLANATION
+
+As best I can tell, the term “context takeover” is indigenous to
+permessage-deflate. The term appears all over the RFC but isn’t explained
+very clearly, in my opinion. Here, then, is an attempt to provide that
+explanation.
+
+As a DEFLATE compressor receives bytes of the stream, it “remembers”
+common sequences of past parts of the stream in a “window” that
+“slides” along with the data stream: this is the LZ77 ”sliding window”.
+
+By default, permessage-deflate retains the previous message’s sliding
+window and uses it to compress the start of the next message;
+this is called “context takeover” because the new message “takes over”
+the “context” (i.e., sliding window) from the previous message. Setting
+one or the other peer to “no context takeover” mode, then, tells that
+peer to empty out its sliding window at the end of each message. This
+means that peer won’t need to retain the sliding window between messages,
+which can reduce memory consumption.
+
+In DEFLATE terms, a compressor does a SYNC flush at the end of each
+message when using context takeover; otherwise the compressor does a
+FULL flush.
+
+Maybe a better term for this behavior would have been “window retention”.
+Anyway, there it is.
 
 =cut
 
@@ -165,19 +134,38 @@ sub inflate_max_window_bits {
     return $self->{'inflate_max_window_bits'} || ( $self->VALID_MAX_WINDOW_BITS() )[-1];
 }
 
-sub local_no_context_takeover {
+=head2 I<OBJ>->deflate_no_context_takeover()
+
+Whether to drop the LZ77 sliding window between messages (i.e.,
+to do a full DEFLATE flush with each FIN frame).
+
+=cut
+
+sub deflate_no_context_takeover {
     my ($self) = @_;
 
-    return !!$self->{'local_no_context_takeover'};
+    return !!$self->{'deflate_no_context_takeover'};
 }
 
-sub peer_no_context_takeover {
+=head2 I<OBJ>->inflate_no_context_takeover()
+
+Whether to ask the peer drop the LZ77 sliding window between messages.
+
+=cut
+
+sub inflate_no_context_takeover {
     my ($self) = @_;
 
-    return !!$self->{'peer_no_context_takeover'};
+    return !!$self->{'inflate_no_context_takeover'};
 }
 
-#Convenience
+=head2 I<OBJ>->create_data_object()
+
+A convenience method that eturns an instance of the appropriate
+subclass of L<Net::WebSocket::PMCE::deflate::Data>.
+
+=cut
+
 sub create_data_object {
     my ($self) = @_;
 
@@ -188,6 +176,14 @@ sub create_data_object {
     return $class->new( %$self );
 }
 
+#----------------------------------------------------------------------
+
+=head2 I<OBJ>->get_handshake_object()
+
+As described in L<Net::WebSocket::Handshake>’s documentation.
+
+=cut
+
 sub get_handshake_object {
     my ($self) = @_;
 
@@ -196,63 +192,15 @@ sub get_handshake_object {
     );
 }
 
-#----------------------------------------------------------------------
-
 =head2 I<OBJ>->consume_parameters( KEY1 => VALUE1, .. )
 
-Alters the given object as per the peer’s request. Ordinarily
-this should be fine, but if for some reason you want to reject the peer’s
-requested options you can inspect the object after this.
+As described in L<Net::WebSocket::Handshake>’s documentation. After
+this function runs, you can inspect the I<OBJ> to ensure that the
+configuration that the peer allows is one that your application
+finds acceptable. (It likely is, but hey.)
 
-The alterations made in response to the different extension
-options are:
-
-=over
-
-=item * Client
-
-=over
-
-=item * <client_no_context_takeover> - Sets the object’s
-C<local_no_context_takeover> flag.
-
-=item * <server_no_context_takeover> - If the object’s
-C<peer_no_context_takeover> flag is set, and if
-we do *not* receive this flag from the peer, then we C<die()>.
-This option is ignored otherwise.
-
-=item * <client_max_window_bits> - If given and less than the object’s
-C<deflate_max_window_bits> option, then that option is reduced to the
-new value.
-
-=item * <server_max_window_bits> - If given and less than the object’s
-C<inflate_max_window_bits> option, then that option is reduced to the
-new value. If given and B<greater> than the object’s
-C<inflate_max_window_bits> option, then we C<die()>.
-
-=back
-
-=item * Server
-
-=over
-
-=item * <client_no_context_takeover> - Sets the object’s
-C<peer_no_context_takeover> flag.
-
-=item * <server_no_context_takeover> - Sets the object’s
-C<local_no_context_takeover> flag.
-
-=item * <client_max_window_bits> - If given and less than the object’s
-C<inflate_max_window_bits> option, then that option is reduced to the
-new value.
-
-=item * <server_max_window_bits> - If given and less than the object’s
-C<deflate_max_window_bits> option, then that option is reduced to the
-new value.
-
-=back
-
-=back
+See this module’s subclasses’ documentation for more details about
+how they handle each parameter.
 
 =cut
 
@@ -272,6 +220,12 @@ sub consume_parameters {
 
     return;
 }
+
+=head2 I<OBJ>->ok_to_use()
+
+As described in L<Net::WebSocket::Handshake>’s documentation.
+
+=cut
 
 sub ok_to_use {
     my ($self) = @_;
@@ -325,8 +279,8 @@ sub _get_parameter_errors {
 }
 
 #Define these as no-ops because all we care about is their truthiness.
-use constant _validate_local_no_context_takeover => ();
-use constant _validate_peer_no_context_takeover => ();
+use constant _validate_deflate_no_context_takeover => ();
+use constant _validate_inflate_no_context_takeover => ();
 
 sub _validate_deflate_max_window_bits {
     return $_[0]->__validate_max_window_bits( 'deflate', $_[1] );
@@ -371,10 +325,10 @@ sub _create_extension_header_parts {
         push @parts, $self->_INFLATE_MAX_WINDOW_BITS_PARAM() => $self->{'inflate_max_window_bits'};
     }
 
-    if ($self->{'local_no_context_takeover'}) {
+    if ($self->{'deflate_no_context_takeover'}) {
         push @parts, $self->_LOCAL_NO_CONTEXT_TAKEOVER_PARAM() => undef;
     }
-    if ($self->{'peer_no_context_takeover'}) {
+    if ($self->{'inflate_no_context_takeover'}) {
         push @parts, $self->_PEER_NO_CONTEXT_TAKEOVER_PARAM() => undef;
     }
 

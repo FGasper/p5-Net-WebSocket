@@ -64,7 +64,7 @@ sub _consume_extension_options {
     if (exists $opts_hr->{'client_no_context_takeover'}) {
         $self->__validate_no_context_takeover( $opts_hr->{'client_no_context_takeover'} );
 
-        $self->{'local_no_context_takeover'} = 1;
+        $self->{'deflate_no_context_takeover'} = 1;
 
         delete $opts_hr->{'client_no_context_takeover'};
     }
@@ -73,7 +73,7 @@ sub _consume_extension_options {
         $self->__validate_no_context_takeover( $opts_hr->{'server_no_context_takeover'} );
         delete $opts_hr->{'server_no_context_takeover'};
     }
-    elsif ($self->{'peer_no_context_takeover'}) {
+    elsif ($self->{'inflate_no_context_takeover'}) {
         die 'server didn’t accept server_no_context_takeover';
     }
 

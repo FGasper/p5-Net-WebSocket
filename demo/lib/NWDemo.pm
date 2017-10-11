@@ -28,7 +28,10 @@ sub get_server_handshake_from_text {
 
     my $req = HTTP::Request->parse($hdrs_txt);
 
-    my $pmd = Net::WebSocket::PMCE::deflate::Server->new();
+    my $pmd = Net::WebSocket::PMCE::deflate::Server->new(
+        inflate_no_context_takeover => 1,
+        deflate_no_context_takeover => 1,
+    );
 
     my $hsk = Net::WebSocket::Handshake::Server->new(
         extensions => [$pmd],

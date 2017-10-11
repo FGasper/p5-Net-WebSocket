@@ -29,7 +29,7 @@ sub _get_request_hash {
 
 #----------------------------------------------------------------------
 
-my $peer_nct = _get_request_hash( peer_no_context_takeover => 1 );
+my $peer_nct = _get_request_hash( inflate_no_context_takeover => 1 );
 
 is_deeply(
     $peer_nct,
@@ -43,7 +43,7 @@ is_deeply(
 #----------------------------------------------------------------------
 
 my $peer_nct_max_bits = _get_request_hash(
-    peer_no_context_takeover => 1,
+    inflate_no_context_takeover => 1,
     inflate_max_window_bits => 10,
 );
 
@@ -60,8 +60,8 @@ is_deeply(
 #----------------------------------------------------------------------
 
 my $all_params = _get_request_hash(
-    local_no_context_takeover => 1,
-    peer_no_context_takeover => 1,
+    deflate_no_context_takeover => 1,
+    inflate_no_context_takeover => 1,
     inflate_max_window_bits => 10,
     deflate_max_window_bits => 11,
 );

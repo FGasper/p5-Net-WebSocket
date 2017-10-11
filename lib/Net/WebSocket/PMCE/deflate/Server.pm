@@ -11,16 +11,20 @@ Net::WebSocket::PMCE::deflate::Server - permessage-deflate for a server
 
 =head1 SYNOPSIS
 
-    my $deflate = Net::WebSocket::PMCE::deflate::Server->new();
+    my $deflate = Net::WebSocket::PMCE::deflate::Server->new( %opts );
 
-    $deflate->consume_peer_extensions( @extn_objs );
+    #You’ll probably want Net::WebSocket::Handshake
+    #to do this for you, but just in case:
+    #$deflate->consume_parameters( @params_kv );
 
     #OPTIONAL: Inspect $deflate to be sure you’re happy with the setup
     #that the client’s parameters allow.
 
-    my $data_obj = $deflate->create_data_object();
+    #Send this to the client.
+    my $handshake = $deflate->create_handshake_object();
 
-    #...and now use the data object to send/receive messages.
+    #...and now use this to send/receive messages.
+    my $data_obj = $deflate->create_data_object();
 
 =head1 DESCRIPTION
 
@@ -38,7 +42,7 @@ For example, if you do this:
 
 … and then this has no C<client_max_window_bits>:
 
-    $deflate->consume_peer_extensions( @extn_objs );
+    $deflate->consume_parameters( @extn_objs );
 
 … then that means the client doesn’t understand C<client_max_window_bits>,
 which means we can’t send that parameter. When this happens, C<$deflate>
@@ -96,6 +100,31 @@ sub new {
 
     return $self;
 }
+
+=head2 I<OBJ>->consume_parameters( KEY1 => VALUE1, .. )
+
+Inherited from the base class. The alterations made in response
+to the different parameters are:
+
+=over
+
+=item * <client_no_context_takeover> - Sets the object’s
+C<inflate_no_context_takeover> flag.
+
+=item * <server_no_context_takeover> - Sets the object’s
+C<deflate_no_context_takeover> flag.
+
+=item * <client_max_window_bits> - If given and less than the object’s
+C<inflate_max_window_bits> option, then that option is reduced to the
+new value.
+
+=item * <server_max_window_bits> - If given and less than the object’s
+C<deflate_max_window_bits> option, then that option is reduced to the
+new value.
+
+=back
+
+=cut
 
 sub _create_extension_header_parts {
     my ($self) = @_;
