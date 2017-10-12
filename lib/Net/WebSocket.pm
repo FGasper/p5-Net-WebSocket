@@ -72,8 +72,7 @@ Net::WebSocket also “has no opinions” about how you should do I/O or HTTP
 headers. There are too many different ways to accomplish HTTP header
 management in particular for it to be sensible for a WebSocket library to
 impose any one approach. As a result of this, Net::WebSocket can likely
-fit your project; however, it won’t absolve you of the need to know some
-things about the WebSocket protocol itself. There are some examples
+fit your project with minimal overhead. There are some examples
 of how you might write complete applications (client or server)
 in the distribution’s C<demo/> directory.
 

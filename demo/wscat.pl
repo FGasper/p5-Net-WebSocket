@@ -32,7 +32,7 @@ use Net::WebSocket::HTTP_R ();
 use constant {
     MAX_CHUNK_SIZE => 64000,
     CRLF => "\x0d\x0a",
-    DEBUG => 1,
+    DEBUG => 0,
 
     SEND_FRAME_CLASS => 'Net::WebSocket::Frame::binary',
 };
@@ -134,7 +134,7 @@ sub run {
             );
 
             my $hdr = $handshake->to_string();
-print "SENDING HEADERS:\n$hdr";
+            DEBUG && print "SENDING HEADERS:\n$hdr";
 
             $self->write( $hdr );
 
@@ -154,7 +154,7 @@ print "SENDING HEADERS:\n$hdr";
 
                 my $hdrs_txt = $read_obj->read( $idx + 2 * length(CRLF) );
 
-print "HEADERS:\n$hdrs_txt\n";
+                DEBUG && print "HEADERS:\n$hdrs_txt\n";
                 my $resp = HTTP::Response->parse($hdrs_txt);
 
                 Net::WebSocket::HTTP_R::handshake_consume_response(
