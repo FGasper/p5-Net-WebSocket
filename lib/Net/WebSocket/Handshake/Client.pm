@@ -13,41 +13,30 @@ Net::WebSocket::Handshake::Client
         #required
         uri => 'ws://haha.test',
 
-        #optional
-        subprotocols => [ 'echo', 'haha' ],
-
         #optional, to imitate a web client
         origin => ..,
 
         #optional, base 64 .. auto-created if not given
         key => '..',
 
-        #optional, instances of Net::WebSocket::Handshake::Extension
+        #optional
+        subprotocols => [ 'echo', 'haha' ],
+
+        #optional
         extensions => \@extension_objects,
     );
 
-    #Note the need to conclude the header text manually.
-    #This is by design, so you can add additional headers.
-    my $hdr = $hsk->create_header_text() . "\x0d\x0a";
+    print $hsk->to_string();
 
-    my $b64 = $hsk->get_key();
-
-    #Validates the value of the “Sec-WebSocket-Accept” header;
-    #throws Net::WebSocket::X::BadAccept if not.
-    $hsk->validate_accept_or_die($accent_value);
+    $hsk->consume_headers( NAME1 => VALUE1, .. );
 
 =head1 DESCRIPTION
 
 This class implements WebSocket handshake logic for a client.
+It handles the basics of handshaking and, optionally, subprotocol
+and extension negotiation.
 
-Because Net::WebSocket tries to be agnostic about how you parse your HTTP
-headers, this class doesn’t do a whole lot for you: it’ll create a base64
-key for you and create “starter” headers for you. It also can validate
-the C<Sec-WebSocket-Accept> header value from the server.
-
-B<NOTE:> C<create_header_text()> does NOT provide the extra trailing
-CRLF to conclude the HTTP headers. This allows you to add additional
-headers beyond what this class gives you.
+It is a subclass of L<Net::WebSocket::Handshake>.
 
 =cut
 
@@ -65,6 +54,24 @@ use constant SCHEMAS => (
     'ws', 'wss',
     'http', 'https',
 );
+
+=head1 METHODS
+
+=head2 I<OBJ>->new( %OPTS )
+
+Returns an instance of the class; %OPTS includes the options from
+L<Net::WebSocket::Handshake> as well as:
+
+=over
+
+=item * C<uri> - (required) The full URI you’re connecting to.
+
+=item * C<origin> - (optional) The HTTP Origin header’s value. Useful
+for imitating a web browser.
+
+=back
+
+=cut
 
 sub new {
     my ($class, %opts) = @_;
@@ -88,6 +95,19 @@ sub new {
     return $class->SUPER::new(%opts);
 }
 
+=head2 I<OBJ>->valid_status_or_die( CODE, REASON )
+
+Throws an exception if the given CODE isn’t the HTTP status code (101)
+that WebSocket requires in response to all requests. (REASON is included
+with the exception on error; otherwise it’s unused.)
+
+You only need this if if you’re not using a request-parsing interface
+that’s compatible with L<HTTP::Response>; otherwise,
+L<Net::WebSocket::HTTP_R>’s C<handshake_consume_response()> function
+will do this (and other niceties) for you.
+
+=cut
+
 sub valid_status_or_die {
     my ($self, $code, $reason) = @_;
 
@@ -98,6 +118,7 @@ sub valid_status_or_die {
     return;
 }
 
+#Shouldn’t be needed?
 sub get_key {
     my ($self) = @_;
 
@@ -106,6 +127,26 @@ sub get_key {
 
 #----------------------------------------------------------------------
 #Legacy:
+
+=head1 LEGACY INTERFACE: SYNOPSIS
+
+    my $hsk = Net::WebSocket::Handshake::Client->new(
+
+        #..same as the newer interface, except:
+
+        #optional
+        extensions => \@extension_objects,
+    );
+
+    print $hsk->create_header_text() . "\x0d\x0a";
+
+    #...Parse the response’s headers yourself...
+
+    #Validates the value of the “Sec-WebSocket-Accept” header;
+    #throws Net::WebSocket::X::BadAccept if not.
+    $hsk->validate_accept_or_die($accept_value);
+
+=cut
 
 sub validate_accept_or_die {
     my ($self, $received) = @_;

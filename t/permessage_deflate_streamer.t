@@ -5,15 +5,14 @@ use Test::More;
 plan tests => 2;
 
 use Net::WebSocket::Message ();
-use Net::WebSocket::PMCE::deflate ();
-use Net::WebSocket::PMCE::deflate::Streamer::Server ();
+use Net::WebSocket::PMCE::deflate::Data::Server ();
 
-my $deflate = Net::WebSocket::PMCE::deflate->new();
+my $deflate = Net::WebSocket::PMCE::deflate::Data::Server->new();
 
-my $streamer = Net::WebSocket::PMCE::deflate::Streamer::Server->new('text', $deflate);
+my $streamer = $deflate->create_streamer( 'Net::WebSocket::Frame::text' );
 
 my @frames = (
-    $streamer->create_chunk('Hello'),
+    $streamer->create_chunk('Hello') || (),
     $streamer->create_final('Hello'),
 );
 
@@ -27,10 +26,10 @@ is( $round_trip, 'HelloHello', 'round-trip single message' ) or do {
     diag( sprintf "%v.02x\n", $_ ) for map { $_->to_bytes() } @frames;
 };
 
-my $streamer2 = Net::WebSocket::PMCE::deflate::Streamer::Server->new('text', $deflate);
+my $streamer2 = $deflate->create_streamer( 'Net::WebSocket::Frame::text' );
 
 my @frames2 = (
-    $streamer2->create_chunk('Hello'),
+    $streamer2->create_chunk('Hello') || (),
     $streamer2->create_final('Hello'),
 );
 

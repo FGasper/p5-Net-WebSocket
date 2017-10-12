@@ -13,14 +13,13 @@ Net::WebSocket::Handshake::Server
         #optional
         subprotocols => [ 'echo', 'haha' ],
 
-        #optional; see below for the interface that these objects
-        #need to expose.
+        #optional
         extensions => \@extension_objects,
     );
 
     $hsk->valid_method_or_die( $http_method );  #optional
 
-    $hsk->consume_peer_headers(@headers_kv_pairs);
+    $hsk->consume_headers(@headers_kv_pairs);
 
     #Note the need to conclude the header text manually.
     #This is by design, so you can add additional headers.
@@ -29,49 +28,8 @@ Net::WebSocket::Handshake::Server
 =head1 DESCRIPTION
 
 This class implements WebSocket handshake logic for a server.
-
-Because Net::WebSocket tries to be agnostic about how you parse your HTTP
-headers, this class doesn’t do a whole lot for you: it’ll give you the
-C<Sec-WebSocket-Accept> header value given a base64
-C<Sec-WebSocket-Key> (i.e., from the client), and it’ll give you
-a “basic” response header text.
-
-B<NOTE:> C<create_header_text()> does NOT provide the extra trailing
-CRLF to conclude the HTTP headers. This allows you to add additional
-headers beyond what this class gives you.
-
-=head1 EXTENSION CLASSES
-
-This class uses the following methods of the objects of the
-C<extensions> array:
-
-
-
-=head1 LEGACY INTERFACE
-
-Prior to version 0.5 this module was a great deal less “helpful”:
-it required callers to parse out and write WebSocket headers,
-doing most of the validation manually. Version 0.5 added a generic
-interface for entering in HTTP headers, which allows Net::WebSocket to
-handle the parsing and creation of HTTP headers.
-
-For now the legacy functionality is being left in; however,
-it is considered DEPRECATED and will be removed eventually.
-
-    my $hsk = Net::WebSocket::Handshake::Server->new(
-
-        #base 64
-        key => '..',
-
-        #optional - same as in non-legacy interface
-        subprotocols => [ 'echo', 'haha' ],
-
-        #optional, instances of Net::WebSocket::Handshake::Extension
-        extensions => \@extension_objects,
-    );
-
-    #Use this to write out the Sec-WebSocket-Accept header.
-    my $b64 = $hsk->get_accept();
+It handles the basics of handshaking and, optionally, subprotocol
+and extension negotiation.
 
 =cut
 
@@ -86,6 +44,28 @@ use Digest::SHA ();
 use Net::WebSocket::Constants ();
 use Net::WebSocket::X ();
 
+#no-op
+use constant _handle_unrecognized_extension => ();
+
+=head1 METHODS
+
+=head2 I<CLASS>->new( %OPTS )
+
+Returns an instance of this class. %OPTS is as described in the base class;
+there are no options specific to this class.
+
+=head2 I<OBJ>->valid_method_or_die( METHOD )
+
+Throws an exception if the given METHOD isn’t the HTTP method (GET) that
+WebSocket requires for all requests.
+
+You only need this if if you’re not using a request-parsing interface
+that’s compatible with L<HTTP::Request>; otherwise,
+L<Net::WebSocket::HTTP_R>’s C<handshake_consume_request()> function
+will do this (and other niceties) for you.
+
+=cut
+
 sub valid_method_or_die {
     my ($self, $method) = @_;
 
@@ -95,8 +75,6 @@ sub valid_method_or_die {
 
     return;
 }
-
-*get_accept = __PACKAGE__->can('_get_accept');
 
 sub _consume_peer_header {
     my ($self, $name => $value) = @_;
@@ -176,6 +154,28 @@ sub _create_header_lines {
     );
 }
 
-use constant _handle_unrecognized_extension => ();
+#----------------------------------------------------------------------
+
+=head1 LEGACY INTERFACE: SYNOPSIS
+
+    #...Parse the request’s headers yourself...
+
+    my $hsk = Net::WebSocket::Handshake::Server->new(
+
+        #base 64, gotten from request
+        key => '..',
+
+        #optional - same as in non-legacy interface
+        subprotocols => [ 'echo', 'haha' ],
+
+        #optional, instances of Net::WebSocket::Handshake::Extension
+        extensions => \@extension_objects,
+    );
+
+    print $hsk->create_header_text() . "\x0d\x0a";
+
+=cut
+
+*get_accept = __PACKAGE__->can('_get_accept');
 
 1;

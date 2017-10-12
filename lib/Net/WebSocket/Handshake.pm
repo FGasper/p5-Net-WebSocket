@@ -97,7 +97,7 @@ sub get_subprotocol {
     my $self = shift;
 
     if (!$self->{'_no_use_legacy'}) {
-        die 'Must call consume_peer_headers() first!';
+        die 'Must call consume_headers() first!';
     }
 
     return $self->{'_subprotocol'};
@@ -111,7 +111,7 @@ sub get_subprotocol {
 #    return { %{ $self->{'_match_extensions'} } };
 #}
 
-sub consume_peer_headers {
+sub consume_headers {
     my ($self, @kv_pairs) = @_;
 
     $self->{'_no_use_legacy'} = 1;
@@ -134,6 +134,10 @@ If you use this object
 to negotiate a subprotocol and/or extensions, those will be included
 in the output from this method.
 
+To append custom headers, do the following with the result of this method:
+
+     substr($hdrs_txt, -2, 0) = '..';
+
 =cut
 
 sub to_string {
@@ -142,11 +146,23 @@ sub to_string {
     return join( CRLF(), $self->_create_header_lines(), q<>, q<> );
 }
 
+=head1 LEGACY INTERFACE
+
+Prior to version 0.5 this module was a great deal less “helpful”:
+it required callers to parse out and write WebSocket headers,
+doing most of the validation manually. Version 0.5 added a generic
+interface for entering in HTTP headers, which allows Net::WebSocket to
+handle the parsing and creation of HTTP headers as well as subprotocol
+and extension negotiation.
+
+For now the legacy functionality is being left in; however,
+it is considered DEPRECATED and will be removed eventually.
+
 =head2 my $hdrs_txt = I<OBJ>->create_header_text()
 
-B<LEGACY.> The same output as C<to_string()> but minus the 2nd trailing
+The same output as C<to_string()> but minus the 2nd trailing
 CR/LF. (This was intended to facilitate adding other headers; however,
-that’s done easily enough by just C<substr($txt, -2, 0) = '..'>.)
+that’s done easily enough with the newer C<to_string()>.)
 
 =cut
 

@@ -73,7 +73,7 @@ sub _handshake_consume_common {
         }
     }
 
-    return $hsk->consume_peer_headers(@hdrs);
+    return $hsk->consume_headers(@hdrs);
 }
 
 1;
