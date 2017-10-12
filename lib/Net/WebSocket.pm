@@ -1,6 +1,6 @@
 package Net::WebSocket;
 
-our $VERSION = '0.04';
+our $VERSION = '0.05-TRIAL1';
 
 =encoding utf-8
 
@@ -10,19 +10,23 @@ Net::WebSocket - WebSocket in Perl
 
 =head1 SYNOPSIS
 
+    use Net::WebSocket::Handshake::Client ();
+    use Net::WebSocket::HTTP_R ();
+
     my $handshake = Net::WebSocket::Handshake::Client->new(
         uri => $uri,
     );
 
-    syswrite $inet, $handshake->create_header_text() . "\x0d\x0a" or die $!;
+    syswrite $inet, $handshake->to_string() or die $!;
 
     #You can parse HTTP headers however you want;
     #Net::WebSocket makes no assumptions about this.
-    my $req = HTTP::Response->parse($hdrs_txt);
+    my $resp = HTTP::Response->parse($hdrs_txt);
 
-    #XXX More is required for the handshake validation in production!
-    my $accept = $req->header('Sec-WebSocket-Accept');
-    $handshake->validate_accept_or_die($accept);
+    #If you use an interface that’s compatible with HTTP::Response,
+    #then you can take advantage of this convenience function;
+    #otherwise you’ll need to do a bit more work.
+    Net::WebSocket::HTTP_R::handshake_parse_response( $handshake, $resp );
 
     #See below about IO::Framed
     my $parser = Net::WebSocket::Parser->new(

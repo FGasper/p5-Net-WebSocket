@@ -24,7 +24,7 @@ my $client = Net::WebSocket::Handshake::Client->new(
     origin => 'http://some.where',
 );
 
-my $req = HTTP::Request->parse( $client->create_header_text() );
+my $req = HTTP::Request->parse( $client->to_string() );
 
 #----------------------------------------------------------------------
 

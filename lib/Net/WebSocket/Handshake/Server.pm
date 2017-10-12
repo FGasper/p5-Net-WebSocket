@@ -21,9 +21,7 @@ Net::WebSocket::Handshake::Server
 
     $hsk->consume_headers(@headers_kv_pairs);
 
-    #Note the need to conclude the header text manually.
-    #This is by design, so you can add additional headers.
-    my $resp_hdr = $hsk->create_header_text() . "\x0d\x0a";
+    my $resp_hdr = $hsk->to_string();
 
 =head1 DESCRIPTION
 
@@ -172,6 +170,7 @@ sub _create_header_lines {
         extensions => \@extension_objects,
     );
 
+    #Note the need to conclude the header text manually.
     print $hsk->create_header_text() . "\x0d\x0a";
 
 =cut

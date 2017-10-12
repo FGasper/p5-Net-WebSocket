@@ -133,10 +133,10 @@ sub run {
                 extensions => [$deflate],
             );
 
-            my $hdr = $handshake->create_header_text();
-print "SENDING HEADERS:\n$hdr\n";
+            my $hdr = $handshake->to_string();
+print "SENDING HEADERS:\n$hdr";
 
-            $self->write( $hdr . CRLF );
+            $self->write( $hdr );
 
             $sent_handshake = 1;
         },

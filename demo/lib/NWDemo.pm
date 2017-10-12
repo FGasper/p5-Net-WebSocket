@@ -55,11 +55,11 @@ sub handshake_as_server {
 
     die "read(): $!" if !defined $count;
 
-    my $hdr_text = $hsk->create_header_text();
+    my $hdr_text = $hsk->to_string();
 
     my @extra_headers;
     if ($req_handler) {
-        $hdr_text .= $_ . CRLF for $req_handler->($req, $hsk);
+        substr( $hdr_text, -2, 0 ) = $_ . CRLF for $req_handler->($req, $hsk);
     }
 
     print { $inet } $hdr_text . CRLF or die "send(): $!";

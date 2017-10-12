@@ -149,7 +149,7 @@ my $server = IO::Events::Socket::TCP->new(
 
                     #----------------------------------------------------------------------
 
-                    $client_hdl->write( $hsk->create_header_text() . "\x0d\x0a" );
+                    $client_hdl->write( $hsk->to_string() );
                     $did_handshake = 1;
 
                     my $pty = IO::Pty->new();

@@ -96,10 +96,10 @@ sub _handshake_as_client {
         uri => $uri,
     );
 
-    my $hdr = $handshake->create_header_text();
+    my $hdr = $handshake->to_string();
 
     #Write out the client handshake.
-    IO::SigGuard::syswrite( $inet, $hdr . CRLF );
+    IO::SigGuard::syswrite( $inet, $hdr );
 
     my $handshake_ok;
 
