@@ -62,7 +62,7 @@ sub handshake_as_server {
         substr( $hdr_text, -2, 0 ) = $_ . CRLF for $req_handler->($req, $hsk);
     }
 
-    print { $inet } $hdr_text . CRLF or die "send(): $!";
+    print { $inet } $hdr_text or die "send(): $!";
 
     return $pmd_data;
 }

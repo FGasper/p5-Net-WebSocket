@@ -24,11 +24,9 @@ use NWDemo ();
 use Net::WebSocket::Endpoint::Server ();
 use Net::WebSocket::Frame::text ();
 use Net::WebSocket::Frame::binary ();
-use Net::WebSocket::Frame::continuation ();
 use Net::WebSocket::Handshake::Server ();
 use Net::WebSocket::Parser ();
 
-use Net::WebSocket::Handshake::Extension ();
 use Net::WebSocket::PMCE::deflate::Server ();
 
 $SIG{'PIPE'} = 'IGNORE';
