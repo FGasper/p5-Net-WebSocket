@@ -154,6 +154,14 @@ while ( my $sock = $server->accept() ) {
 
                 $framed_obj->write( $answer_f->to_bytes() );
             }
+            else {
+                my $close = $ept->received_close_frame();
+
+                if ($close) {
+                    my ($code, $reason) = $close->get_code_and_reason();
+                    printf STDERR "Got CLOSE ($code:$reason)\n";
+                }
+            }
         }
     }
 
