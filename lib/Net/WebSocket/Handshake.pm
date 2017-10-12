@@ -11,9 +11,10 @@ Net::WebSocket::Handshake - base class for handshake objects
 
 =head1 DESCRIPTION
 
-This base class’s C<::Client> and C<::Server> subclasses implement
-WebSocket’s handshake logic. They handle the basics of a WebSocket handshake
-and, optionally, subprotocol and extension negotiation.
+This base class’s L<Net::WebSocket::Handshake::Server> and
+L<Net::WebSocket::Handshake::Client> subclasses implement
+WebSocket’s handshake logic. They handle the basics of a WebSocket
+handshake and, optionally, subprotocol and extension negotiation.
 
 This base class is NOT directly instantiable.
 
@@ -26,7 +27,10 @@ use Module::Load ();
 use Net::WebSocket::HTTP ();
 use Net::WebSocket::X ();
 
-use constant _WS_MAGIC_CONSTANT => '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
+use constant {
+    _WS_MAGIC_CONSTANT => '258EAFA5-E914-47DA-95CA-C5AB0DC85B11',
+    CRLF => "\x0d\x0a",
+};
 
 #----------------------------------------------------------------------
 
@@ -34,7 +38,9 @@ use constant _WS_MAGIC_CONSTANT => '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
 
 =head2 I<CLASS>->new( %OPTS )
 
-Returns an instance of the relevant subclass (C<::Client> or C<::Server>).
+Returns an instance of the relevant subclass
+(L<Net::WebSocket::Handshake::Client|::Client> or
+L<Net::WebSocket::Handshake::Server|::Server>).
 The following are common options for both:
 
 =over
@@ -81,24 +87,6 @@ sub new {
     return bless \%opts, $class;
 }
 
-=head2 my $hdrs_txt = I<OBJ>->create_header_text()
-
-The text of the HTTP headers to send, B<MINUS> the final trailing CR/LF.
-(The lack of trailing CR/LF allows you to add whatever other headers you
-may desire.)
-
-If you use this object
-to negotiate a subprotocol and/or extensions, those will be included
-in the output from this method.
-
-=cut
-
-sub create_header_text {
-    my $self = shift;
-
-    return join( "\x0d\x0a", $self->_create_header_lines(), q<> );
-}
-
 =head2 $sp_token = I<OBJ>->get_subprotocol()
 
 Returns the negotiated subprotocol’s token (e.g., C<wamp.2.json>).
@@ -135,6 +123,37 @@ sub consume_peer_headers {
     $self->_valid_headers_or_die();
 
     return;
+}
+
+=head2 my $hdrs_txt = I<OBJ>->to_string()
+
+The text of the HTTP headers to send, with the 2nd trailing CR/LF
+that ends the headers portion of an HTTP message.
+
+If you use this object
+to negotiate a subprotocol and/or extensions, those will be included
+in the output from this method.
+
+=cut
+
+sub to_string {
+    my $self = shift;
+
+    return join( CRLF(), $self->_create_header_lines(), q<>, q<> );
+}
+
+=head2 my $hdrs_txt = I<OBJ>->create_header_text()
+
+B<LEGACY.> The same output as C<to_string()> but minus the 2nd trailing
+CR/LF. (This was intended to facilitate adding other headers; however,
+that’s done easily enough by just C<substr($txt, -2, 0) = '..'>.)
+
+=cut
+
+sub create_header_text {
+    my $self = shift;
+
+    return join( CRLF(), $self->_create_header_lines(), q<> );
 }
 
 =head1 SEE ALSO

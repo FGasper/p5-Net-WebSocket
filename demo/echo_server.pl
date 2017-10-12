@@ -31,6 +31,8 @@ use Net::WebSocket::Parser ();
 use Net::WebSocket::Handshake::Extension ();
 use Net::WebSocket::PMCE::deflate::Server ();
 
+$SIG{'PIPE'} = 'IGNORE';
+
 my $host_port = $ARGV[0] || die "Need host:port or port!\n";
 
 if (index($host_port, ':') == -1) {
@@ -113,17 +115,42 @@ while ( my $sock = $server->accept() ) {
             #If this returns falsey, whether we get undef or q<>
             #we react the same way.
             if ( $msg ) {
-                my $answer_f = 'Net::WebSocket::Frame::' . $msg->get_type();
+                my $frame_class = 'Net::WebSocket::Frame::' . $msg->get_type();
+                my $answer_f;
 
-                if ($deflate_data && $deflate_data->message_is_compressed($msg)) {
-                    $answer_f = $deflate_data->create_message(
-                        $answer_f,
-                        $deflate_data->decompress( $msg->get_payload() ),
-                    );
+                my $payload = $msg->get_payload();
+
+                if ($deflate_data) {
+                    if ($deflate_data->message_is_compressed($msg)) {
+                        $payload = $deflate_data->decompress( $msg->get_payload() );
+                    }
+
+                    if ( rand > 0.5 ) {
+
+                        my $streamer = $deflate_data->create_streamer($frame_class);
+
+                        while ( length($payload) > 1 ) {
+                            $answer_f = $streamer->create_chunk(
+                                substr( $payload, 0, 1, q<> ),
+                            );
+
+                            if ($answer_f) {
+                                $framed_obj->write( $answer_f->to_bytes() );
+                            }
+                        }
+
+                        $answer_f = $streamer->create_final($payload);
+                    }
+                    else {
+                        $answer_f = $deflate_data->create_message(
+                            $frame_class,
+                            $payload,
+                        );
+                    }
                 }
                 else {
-                    $answer_f = $answer_f->new(
-                        payload_sr => \$msg->get_payload(),
+                    $answer_f = $frame_class->new(
+                        payload_sr => \$payload,
                     );
                 }
 

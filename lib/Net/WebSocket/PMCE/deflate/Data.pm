@@ -5,11 +5,11 @@ use warnings;
 
 use Module::Load ();
 
+use Net::WebSocket::PMCE::deflate::Constants ();
 use Net::WebSocket::Message ();
 use Net::WebSocket::PMCE ();
 
 use constant {
-    INITIAL_FRAME_RSV => 0b100,  #RSV1
     _ZLIB_SYNC_TAIL => "\0\0\xff\xff",
     _DEBUG => 0,
 };
@@ -64,10 +64,17 @@ instance of the class that C<Net::WebSocket::Message::create_from_frames()>
 would instantiate; e.g., if FRAME_CLASS is C<Net::WebSocket::Frame::text>,
 the message will be of type C<Net::WebSocket::Message::text>.
 
+This method cannot be called while a streamer object has yet to create its
+final frame.
+
+B<NOTE:> This function alters PAYLOAD.
+
 =cut
 
 sub create_message {
     my ($self, $frame_class) = @_;    #$_[2] = payload
+
+    die "A streamer is active!" if $self->{'_streamer_mode'};
 
     my $compress_func = $self->{'final_frame_compress_func'};
 
@@ -76,7 +83,7 @@ sub create_message {
     return Net::WebSocket::Message::create_from_frames(
         $frame_class->new(
             payload_sr => $payload_sr,
-            rsv => $self->INITIAL_FRAME_RSV(),
+            rsv => Net::WebSocket::PMCE::deflate::Constants::INITIAL_FRAME_RSV(),
             $self->FRAME_MASK_ARGS(),
         ),
     );
@@ -86,7 +93,7 @@ sub create_message {
 
 =head2 $msg = I<OBJ>->create_streamer( FRAME_CLASS )
 
-Returns an instance of L<Net::WebSocket::PMCE::deflate::Streamer> based
+Returns an instance of L<Net::WebSocket::PMCE::deflate::Data::Streamer> based
 on this object.
 
 =cut
@@ -94,9 +101,11 @@ on this object.
 sub create_streamer {
     my ($self, $frame_class) = @_;
 
-    Module::Load::load('Net::WebSocket::PMCE::deflate::Streamer');
+    $self->{'_streamer_mode'} = 1;
 
-    return Net::WebSocket::PMCE::deflate::Streamer->new($self, $frame_class);
+    Module::Load::load('Net::WebSocket::PMCE::deflate::Data::Streamer');
+
+    return Net::WebSocket::PMCE::deflate::Data::Streamer->new($self, $frame_class);
 }
 
 #----------------------------------------------------------------------
@@ -132,20 +141,26 @@ sub decompress {
 my $_payload_sr;
 
 #cf. RFC 7692, 7.2.1
-#Use for fragments.
-sub _compress_fragment {
+#Use for non-final fragments.
+sub _compress_non_final_fragment {
+    $_[0]->{'d'} ||= $_[0]->_create_deflate_obj();
+
     return $_[0]->_compress( $_[1] );
 }
 
 #Preserves sliding window to the next message.
-#Use for final fragments when !!local_context_takeover
+#Use for final fragments when deflate_no_context_takeover if OFF
 sub _compress_sync_flush_chomp {
+    $_[0]->{'d'} ||= $_[0]->_create_deflate_obj();
+
     return _chomp_0000ffff_or_die( $_[0]->_compress( $_[1], Compress::Raw::Zlib::Z_SYNC_FLUSH() ) );
 }
 
 #Flushes the sliding window.
-#Use for final fragments when !local_context_takeover
+#Use for final fragments when deflate_no_context_takeover is ON
 sub _compress_full_flush_chomp {
+    $_[0]->{'d'} ||= $_[0]->_create_deflate_obj();
+
     return _chomp_0000ffff_or_die( $_[0]->_compress( $_[1], Compress::Raw::Zlib::Z_FULL_FLUSH() ) );
 }
 
@@ -161,11 +176,9 @@ sub _chomp_0000ffff_or_die {
 }
 
 sub _compress {
-    my ($self) = @_;
+    my ($self) = @_;    # $_[1] = payload; $_[2] = flush method
 
     $_payload_sr = \$_[1];
-
-    $self->{'d'} ||= $self->_create_deflate_obj();
 
     _DEBUG && _debug(sprintf "to deflate: [%v.02x]", $$_payload_sr);
 
@@ -179,6 +192,8 @@ sub _compress {
     if ($_[2]) {
         $dstatus = $self->{'d'}->flush($out, $_[2]);
         die "deflate flush: $dstatus" if $dstatus != Compress::Raw::Zlib::Z_OK();
+
+        undef $self->{'_streamer_mode'};
 
         _DEBUG && _debug(sprintf "post-flush output: [%v.02x]", $out);
     }
@@ -223,7 +238,7 @@ sub _load_zlib_if_needed {
 sub _create_inflate_obj {
     my ($self) = @_;
 
-    my $window_bits = $self->{'inflate_max_window_bits'} || 15; #XXX TODO
+    my $window_bits = $self->{'inflate_max_window_bits'} || ( Net::WebSocket::PMCE::deflate::Constants::VALID_MAX_WINDOW_BITS() )[-1];
 
     _load_zlib_if_needed();
 
@@ -239,7 +254,7 @@ sub _create_inflate_obj {
 sub _create_deflate_obj {
     my ($self) = @_;
 
-    my $window_bits = $self->{'deflate_max_window_bits'} || 15; #XXX TODO
+    my $window_bits = $self->{'deflate_max_window_bits'} || ( Net::WebSocket::PMCE::deflate::Constants::VALID_MAX_WINDOW_BITS() )[-1];
 
     _load_zlib_if_needed();
 

@@ -166,7 +166,7 @@ sub _consume_extension_options {
         }
     }
 
-    for my $ept_opt ( [ client => 'peer' ], [ server => 'local' ] ) {
+    for my $ept_opt ( [ client => 'inflate' ], [ server => 'deflate' ] ) {
         my $nct_hdr = "$ept_opt->[0]_no_context_takeover";
 
         if (exists $opts_hr->{$nct_hdr}) {

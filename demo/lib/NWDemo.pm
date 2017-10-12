@@ -28,10 +28,7 @@ sub get_server_handshake_from_text {
 
     my $req = HTTP::Request->parse($hdrs_txt);
 
-    my $pmd = Net::WebSocket::PMCE::deflate::Server->new(
-        inflate_no_context_takeover => 1,
-        deflate_no_context_takeover => 1,
-    );
+    my $pmd = Net::WebSocket::PMCE::deflate::Server->new();
 
     my $hsk = Net::WebSocket::Handshake::Server->new(
         extensions => [$pmd],
@@ -49,12 +46,14 @@ sub handshake_as_server {
 
     my $buf = q<>;
     my ($req, $hsk, $pmd_data);
-    while ( IO::SigGuard::sysread($inet, $buf, MAX_CHUNK_SIZE, length $buf ) ) {
+
+    my $count;
+    while ( $count = IO::SigGuard::sysread($inet, $buf, MAX_CHUNK_SIZE, length $buf ) ) {
         ($req, $hsk, $pmd_data) = get_server_handshake_from_text($buf);
         last if $hsk;
     }
 
-    die "read(): $!" if $!;
+    die "read(): $!" if !defined $count;
 
     my $hdr_text = $hsk->create_header_text();
 
@@ -83,7 +82,7 @@ sub set_signal_handlers_for_server {
                 code => $code,
             );
 
-            print { $inet } $frame->to_bytes();
+            print { $inet } $frame->to_bytes() or warn "send close: $!";
 
             $SIG{$the_sig} = 'DEFAULT';
 

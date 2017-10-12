@@ -115,8 +115,8 @@ sub _consume_peer_header {
         Module::Load::load('Net::WebSocket::HTTP');
 
         for my $token ( Net::WebSocket::HTTP::split_tokens($value) ) {
-            if (!defined $self->{'_match_protocol'}) {
-                ($self->{'_match_protocol'}) = grep { $_ eq $token } @{ $self->{'subprotocols'} };
+            if (!defined $self->{'_subprotocol'}) {
+                ($self->{'_subprotocol'}) = grep { $_ eq $token } @{ $self->{'subprotocols'} };
             }
         }
     }
@@ -137,7 +137,7 @@ sub _should_include_extension_in_headers {
 sub _encode_subprotocols {
     my ($self) = @_;
 
-    local $self->{'subprotocols'} = [ defined ($self->{'_match_protocol'}) ? $self->{'_match_protocol'} : () ] if !$self->{'_no_use_legacy'};
+    local $self->{'subprotocols'} = defined($self->{'_subprotocol'}) ? [ $self->{'_subprotocol'} ] : undef if $self->{'_no_use_legacy'};
 
     return $self->SUPER::_encode_subprotocols();
 }
