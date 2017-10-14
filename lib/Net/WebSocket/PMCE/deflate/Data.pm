@@ -113,7 +113,8 @@ sub create_streamer {
 
 Decompresses the given string and returns the result.
 
-B<NOTE:> This function alters COMPRESSED_PAYLOAD.
+B<NOTE:> This function alters COMPRESSED_PAYLOAD, such that
+it’s probably not useful afterward.
 
 =cut
 
