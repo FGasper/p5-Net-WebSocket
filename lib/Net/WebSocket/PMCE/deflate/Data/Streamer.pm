@@ -7,7 +7,7 @@ use warnings;
 
 =head1 NAME
 
-Net::WebSocket::PMCE::deflate::Streamer
+Net::WebSocket::PMCE::deflate::Data::Streamer
 
 =head1 SYNOPSIS
 
@@ -40,7 +40,6 @@ pattern as L<Net::WebSocket::Streamer>.
 use Module::Load ();
 
 use Net::WebSocket::Frame::continuation ();
-use Net::WebSocket::PMCE::deflate::Constants ();
 
 =head1 METHODS
 
@@ -103,7 +102,7 @@ sub _create {
     return undef if !length $$payload_sr;
 
     my $class = $self->{'_frames_count'} ? 'Net::WebSocket::Frame::continuation' : $self->{'_frame_class'};
-    my $rsv = $self->{'_frames_count'} ? 0 : Net::WebSocket::PMCE::deflate::Constants::INITIAL_FRAME_RSV();
+    my $rsv = $self->{'_frames_count'} ? 0 : $data_obj->INITIAL_FRAME_RSV();
 
     $self->{'_frames_count'}++;
 

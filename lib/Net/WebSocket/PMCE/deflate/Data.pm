@@ -3,11 +3,12 @@ package Net::WebSocket::PMCE::deflate::Data;
 use strict;
 use warnings;
 
+use parent qw( Net::WebSocket::PMCE::Data );
+
 use Module::Load ();
 
-use Net::WebSocket::PMCE::deflate::Constants ();
 use Net::WebSocket::Message ();
-use Net::WebSocket::PMCE ();
+use Net::WebSocket::PMCE::deflate::Constants ();
 
 use constant {
     _ZLIB_SYNC_TAIL => "\0\0\xff\xff",
@@ -53,8 +54,6 @@ sub new {
     return bless \%opts, $class;
 }
 
-*message_is_compressed = *Net::WebSocket::PMCE::message_is_compressed;
-
 #----------------------------------------------------------------------
 
 =head2 $msg = I<OBJ>->create_message( FRAME_CLASS, PAYLOAD )
@@ -83,7 +82,7 @@ sub create_message {
     return Net::WebSocket::Message::create_from_frames(
         $frame_class->new(
             payload_sr => $payload_sr,
-            rsv => Net::WebSocket::PMCE::deflate::Constants::INITIAL_FRAME_RSV(),
+            rsv => $self->INITIAL_FRAME_RSV(),
             $self->FRAME_MASK_ARGS(),
         ),
     );
@@ -149,7 +148,7 @@ sub _compress_non_final_fragment {
 }
 
 #Preserves sliding window to the next message.
-#Use for final fragments when deflate_no_context_takeover if OFF
+#Use for final fragments when deflate_no_context_takeover is OFF
 sub _compress_sync_flush_chomp {
     $_[0]->{'d'} ||= $_[0]->_create_deflate_obj();
 
@@ -165,7 +164,7 @@ sub _compress_full_flush_chomp {
 }
 
 sub _chomp_0000ffff_or_die {
-    if ( substr($_[0], -4) eq _ZLIB_SYNC_TAIL ) {
+    if ( rindex( $_[0], _ZLIB_SYNC_TAIL ) == length($_[0]) - 4 ) {
         substr($_[0], -4) = q<>;
     }
     else {

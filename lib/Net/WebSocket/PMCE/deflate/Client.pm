@@ -70,6 +70,8 @@ use constant {
     _LOCAL_NO_CONTEXT_TAKEOVER_PARAM => 'client_no_context_takeover',
     _DEFLATE_MAX_WINDOW_BITS_PARAM => 'client_max_window_bits',
     _INFLATE_MAX_WINDOW_BITS_PARAM => 'server_max_window_bits',
+
+    _ENDPOINT_CLASS => 'Client',
 };
 
 sub _create_extension_header_parts {

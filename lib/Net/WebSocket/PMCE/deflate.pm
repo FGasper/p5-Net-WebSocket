@@ -14,8 +14,12 @@ L<Net::WebSocket::PMCE::deflate::Client> for usage examples.
 =head1 DESCRIPTION
 
 This class implements C<permessage-deflate> as defined in
-L<RFC 7692|https://tools.ietf.org/html/rfc7692>. This is a base class,
-not to be instantiated directly.
+L<RFC 7692|https://tools.ietf.org/html/rfc7692>.
+
+This is a base class, not to be instantiated directly.
+
+This class implements a L<Net::WebSocket::Handshake>-compatible
+extension interface.
 
 =head1 STATUS
 
@@ -28,17 +32,13 @@ issues you find.
 use strict;
 use warnings;
 
-use Call::Context ();
+use parent qw( Net::WebSocket::PMCE::deflate::Constants );
+
 use Module::Load ();
 
 use Net::WebSocket::Handshake::Extension ();
+use Net::WebSocket::PMCE::deflate::Constants ();
 use Net::WebSocket::X ();
-
-use constant {
-    token => 'permessage-deflate',
-};
-
-use constant VALID_MAX_WINDOW_BITS => ( 8 .. 15 );
 
 =head1 METHODS
 
@@ -111,7 +111,7 @@ sub new {
 =head2 I<OBJ>->deflate_max_window_bits()
 
 The effective value of this setting. If unspecified or if the peer doesn’t
-support this feature, the value will be the RFC’s default value.
+support this feature, the returned value will be the RFC’s default value.
 
 =cut
 
@@ -124,7 +124,7 @@ sub deflate_max_window_bits {
 =head2 I<OBJ>->inflate_max_window_bits()
 
 The effective value of this setting. If unspecified or if the peer doesn’t
-support this feature, the value will be the RFC’s default value.
+support this feature, the returned value will be the RFC’s default value.
 
 =cut
 
@@ -303,7 +303,7 @@ sub __validate_no_context_takeover {
 sub __validate_max_window_bits {
     my ($self, $ept, $bits) = @_;
 
-    my @VALID_MAX_WINDOW_BITS = VALID_MAX_WINDOW_BITS();
+    my @VALID_MAX_WINDOW_BITS = $self->VALID_MAX_WINDOW_BITS();
 
     if (defined $bits) {
         return if grep { $_ eq $bits } @VALID_MAX_WINDOW_BITS;
@@ -354,34 +354,3 @@ Copyright 2017 by L<Gasper Software Consulting, LLC|http://gaspersoftware.com>
 =head1 LICENSE
 
 This distribution is released under the same license as Perl.
-
-=cut
-
-__END__
-
-Context takeover: technique for compressing/sending
-increases amount of memory needed to decompress
-
-server_no_context_takeover
-    - “Don’t you use context takeover, Mr. Server!!”
-    - “I swear I will not use context takeover, Mr. Client.”
-    - if client sends, server must send back
-    - if client doesn’t send, server *can* send back
-    - server *should* support feature
-
-client_no_context_takeover
-    - “BTW, Mr. Server, I won’t use context takeover.”
-    - “Don’t you use context takeover, Mr. Client!!”
-    - if server sends, client MUST observe/support
-
-server_max_window_bits = [8 .. 15]
-    - “Don’t you use more than N bits for sliding window size, Mr. Server!”
-    - “I swear I will not use more than N bits.”
-    - (15 is the max/default anyway)
-    - server responds with <= value
-
-client_max_window_bits = empty | [8 .. 15]
-    - server MUST NOT send if client didn’t
-    - if empty, that just indicates support for the option
-
-1;

@@ -71,13 +71,14 @@ a UNIX socket, ordinary TCP/IP, some funky C<tie()>d object, or whatever.
 Net::WebSocket also “has no opinions” about how you should do I/O or HTTP
 headers. There are too many different ways to accomplish HTTP header
 management in particular for it to be sensible for a WebSocket library to
-impose any one approach. As a result of this, Net::WebSocket can likely
+impose any one approach. As a result of this, Net::WebSocket can probably
 fit your project with minimal overhead. There are some examples
 of how you might write complete applications (client or server)
-in the distribution’s C<demo/> directory.
+in the distribution’s F<demo/> directory.
 
-Net::WebSocket is not a “quick” WebSocket solution; for that,
-check out L<Mojolicious>. Net::WebSocket’s purpose is to support anything
+Net::WebSocket is not a “quick” WebSocket solution; L<Mojolicious> and
+the like fill that role amply.
+Net::WebSocket’s purpose is to support anything
 that the WebSocket protocol itself can do, as lightly as possible and without
 prejudice as to how you want to do it: extensions, blocking/non-blocking I/O,
 arbitrary HTTP headers, etc. Net::WebSocket will likely require more of an

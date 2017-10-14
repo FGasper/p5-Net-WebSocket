@@ -45,6 +45,8 @@ run( @ARGV ) if !caller;
 sub run {
     my ($uri) = @_;
 
+    local $SIG{'PIPE'} = 'IGNORE';
+
     -t \*STDIN or die "STDIN must be a TTY for this demo.\n";
 
     my ($uri_scheme, $uri_authority) = URI::Split::uri_split($uri);
@@ -181,6 +183,10 @@ sub run {
 
                 $payload = $msg->get_payload();
 
+                if ($deflate_data && $deflate_data->message_is_compressed($msg)) {
+                    $payload = $deflate_data->decompress($payload);
+                }
+
                 while (length $payload) {
                     syswrite( \*STDOUT, substr( $payload, 0, 65536, q<> ) ) or die "write(STDOUT): $!";
                 }
@@ -217,6 +223,9 @@ sub run {
         },
 
         on_close => sub {
+            $ept->shutdown( code => 'SUCCESS' );
+            $handle->flush();
+
             $closed = 1;
         },
 
@@ -229,11 +238,9 @@ sub run {
         $SIG{$sig} = sub {
             my ($the_sig) = @_;
 
-            my $code = ($the_sig eq 'INT') ? 'SUCCESS' : 'ENDPOINT_UNAVAILABLE';
+            my $code = 'ENDPOINT_UNAVAILABLE';
 
             $ept->shutdown( code => $code );
-
-            local $SIG{'PIPE'} = 'IGNORE';
             $handle->flush();
 
             $SIG{$the_sig} = 'DEFAULT';
