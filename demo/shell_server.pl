@@ -29,7 +29,6 @@ use Net::WebSocket::Endpoint::Server ();
 use Net::WebSocket::Frame::text ();
 use Net::WebSocket::Frame::binary ();
 use Net::WebSocket::Frame::continuation ();
-use Net::WebSocket::Handshake::Server ();
 use Net::WebSocket::Parser ();
 
 use IO::Pty ();
@@ -107,6 +106,8 @@ my $server = IO::Events::Socket::TCP->new(
             },
         );
 
+        my $deflate;
+
         $client_hdl = shift()->accept(
             owner => $loop,
             read => 1,
@@ -130,7 +131,13 @@ my $server = IO::Events::Socket::TCP->new(
                         #printf STDERR ">>>>> from browser: %v.02x\n", $msg->get_payload();
                         #print STDERR _printable( $msg->get_payload() ) . $/;
 
-                        $shell_hdl->write( $msg->get_payload() );
+                        my $payload = $msg->get_payload();
+
+                        if ($deflate && $deflate->message_is_compressed($msg)) {
+                            $payload = $deflate->decompress($payload);
+                        }
+
+                        $shell_hdl->write( $payload );
                     }
                 }
                 else {
@@ -141,7 +148,7 @@ my $server = IO::Events::Socket::TCP->new(
                         out => $client_hdl,
                     );
 
-                    my $hsk = NWDemo::get_server_handshake_from_text($read_obj->get());
+                    (undef, my $hsk, $deflate) = NWDemo::get_server_handshake_from_text($read_obj->get());
                     return if !$hsk;
 
                     #Clear out $read_obj’s buffer.
