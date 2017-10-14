@@ -211,11 +211,11 @@ sub _consume_peer_header {
 
     for my $hdr_part ( qw( Accept Protocol Extensions ) ) {
         if ($name eq "Sec-WebSocket-$hdr_part") {
-            if ( $self->{"_got_$name"} ) {
-                die Net::WebSocket::X->create('BadHeader', $name, $value, 'duplicate');    #XXX TODO - specific?
+            if ( exists $self->{"_got_$name"} ) {
+                die Net::WebSocket::X->create('DuplicateHeader', $name, $self->{"_got_$name"}, $value);
             }
 
-            $self->{"_got_$name"}++;
+            $self->{"_got_$name"} = $value;
         }
     }
 
@@ -225,7 +225,7 @@ sub _consume_peer_header {
     }
     elsif ($name eq 'Sec-WebSocket-Protocol') {
         if (!grep { $_ eq $value } @{ $self->{'subprotocols'} }) {
-            die Net::WebSocket::X->create('BadHeader', $name, $value, 'Unrecognized subprotocol'); #XXX TODO - specific?
+            die Net::WebSocket::X->create('UnknownSubprotocol', $value);
         }
 
         $self->{'_subprotocol'} = $value;
@@ -237,27 +237,10 @@ sub _consume_peer_header {
     return;
 }
 
-sub _validate_received_protocol {
-    my ($self, $value) = @_;
-
-    Module::Load::load('Net::WebSocket::HTTP');
-
-    my @split = Net::WebSocket::HTTP::split_tokens($value);
-    if (@split > 1) {
-        die Net::WebSocket::X->new('BadHeader', 'Sec-WebSocket-Protocol', $value);
-    }
-
-    if (!grep { $value eq $_ } @{ $self->{'subprotocols'} }) {
-        die "Unrecognized subprotocol: “$value”";   #TODO XXX
-    }
-
-    return;
-}
-
 sub _handle_unrecognized_extension {
     my ($self, $xtn_obj) = @_;
 
-    die "Unrecognized extension: " . $xtn_obj->to_string(); #XXX TODO
+    die Net::WebSocket::X->create('UnknownExtension', $xtn_obj->to_string());
 }
 
 

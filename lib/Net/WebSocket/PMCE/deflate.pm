@@ -161,7 +161,7 @@ sub inflate_no_context_takeover {
 
 =head2 I<OBJ>->create_data_object()
 
-A convenience method that eturns an instance of the appropriate
+A convenience method that returns an instance of the appropriate
 subclass of L<Net::WebSocket::PMCE::deflate::Data>.
 
 =cut
@@ -169,7 +169,6 @@ subclass of L<Net::WebSocket::PMCE::deflate::Data>.
 sub create_data_object {
     my ($self) = @_;
 
-    #TODO: rename classes
     my $class = __PACKAGE__ . '::Data::' . $self->_ENDPOINT_CLASS();
     Module::Load::load($class);
 

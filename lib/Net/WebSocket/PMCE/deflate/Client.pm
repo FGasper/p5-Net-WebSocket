@@ -91,7 +91,7 @@ sub _consume_extension_options {
     my ($self, $opts_hr) = @_;
 
     if (exists $opts_hr->{'server_max_window_bits'}) {
-        #TODO: validate_max_window_bits()
+        $self->__validate_max_window_bits('server', $opts_hr->{'server_max_window_bits'});
 
         if ( $opts_hr->{'server_max_window_bits'} > $self->inflate_max_window_bits() ) {
             die 'server_max_window_bits greater than client stipulated!';
@@ -102,12 +102,7 @@ sub _consume_extension_options {
     }
 
     if (exists $opts_hr->{'client_max_window_bits'}) {
-        #TODO: validate_max_window_bits()
-
-        #We always support this.
-        #if (!exists $self->{'inflate_max_window_bits'}) {
-        #    die 'server requested client_max_window_bits without client support!';
-        #}
+        $self->__validate_max_window_bits('client', $opts_hr->{'client_max_window_bits'});
 
         my $max = $self->deflate_max_window_bits();
 
@@ -134,24 +129,16 @@ sub _consume_extension_options {
         delete $opts_hr->{'server_no_context_takeover'};
     }
     elsif ($self->{'inflate_no_context_takeover'}) {
-        die 'server didn’t accept server_no_context_takeover';
+
+        #The RFC doesn’t seem to have a problem with a server that
+        #neglects a client’s server_no_context_takeover request.
+
+        #die 'server didn’t accept server_no_context_takeover';
+
+        delete $self->{'inflate_no_context_takeover'};
     }
 
     return;
 }
-
-##TODO: exception objects
-#sub consume_response_header_parts {
-#    my ($self, @extensions) = @_;
-#
-#    return $self->_consume_header_parts(
-#        \@extensions,
-#        sub {
-#            my $opts_hr = shift;
-#
-#
-#        },
-#    );
-#}
 
 1;
