@@ -178,6 +178,14 @@ sub create_data_object {
 
 #----------------------------------------------------------------------
 
+=head2 I<OBJ>->token()
+
+As described in L<Net::WebSocket::Handshake>’s documentation.
+
+=cut
+
+#====== INHERITED from an undocumented base class
+
 =head2 I<OBJ>->get_handshake_object()
 
 As described in L<Net::WebSocket::Handshake>’s documentation.
