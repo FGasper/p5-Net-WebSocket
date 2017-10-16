@@ -31,6 +31,10 @@ use Net::WebSocket::Frame::binary ();
 use Net::WebSocket::Frame::continuation ();
 use Net::WebSocket::Parser ();
 
+use constant {
+    SEND_FRAME_CLASS => 'Net::WebSocket::Frame::binary',
+};
+
 use IO::Pty ();
 
 #for setsid()
@@ -202,17 +206,28 @@ my $server = IO::Events::Socket::TCP->new(
                         on_read => sub {
                             my ($self) = @_;
 
-                            #Needs to be binary in case of ZMODEM transfer.
-                            my $frame = Net::WebSocket::Frame::binary->new(
-                                payload_sr => \$self->read(),
-                            );
+                            my $frame_or_msg;
+
+                            if ($deflate) {
+                                $frame_or_msg = $deflate->create_message(
+                                    SEND_FRAME_CLASS(),
+                                    $self->read(),
+                                );
+                            }
+                            else {
+
+                                #Needs to be binary in case of ZMODEM transfer.
+                                $frame_or_msg = SEND_FRAME_CLASS()->new(
+                                    payload_sr => \$self->read(),
+                                );
+                            }
 
                             #printf STDERR "to client: %s\n", ($frame->to_bytes() =~ s<([\x80-\xff])><sprintf '\x%02x', ord $1>gre);
                             #printf STDERR "<<<<< to client: %v.02x\n", $frame->get_payload();
                             #printf STDERR "<<<<< to client: %d\n", length $frame->get_payload();
                             #print STDERR _printable( $frame->get_payload() ) . $/;
 
-                            $client_hdl->write($frame->to_bytes());
+                            $client_hdl->write($frame_or_msg->to_bytes());
                         },
 
                         pid => $cpid,
