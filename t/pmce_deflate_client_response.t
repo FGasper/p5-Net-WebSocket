@@ -8,7 +8,7 @@ use Test::Exception;
 
 use constant EXT_CLASS => 'Net::WebSocket::Handshake::Extension';
 
-plan tests => 1 + 15;
+plan tests => 1 + 16;
 
 use Net::WebSocket::PMCE::deflate::Client ();
 
@@ -57,26 +57,22 @@ ok(
     'inflate_no_context_takeover() default = off',
 );
 
-#Catch this in Net::WebSocket::Handshake instead.
-#dies_ok(
-#    sub {
-#        $pmd->consume_parameters(
-#            'client_no_context_takeover' => undef,
-#        );
-#    },
-#    'consume_peer_extensions() only works once (for a client)',
-#);
-
 #----------------------------------------------------------------------
 #server_no_context_takeover
+
 {
     my $pmd = Net::WebSocket::PMCE::deflate::Client->new( inflate_no_context_takeover => 1 );
 
-    dies_ok(
+    lives_ok(
         sub {
             $pmd->consume_parameters();
         },
-        'inflate_no_context_takeover - dies when !received server_no_context_takeover',
+        'inflate_no_context_takeover - lives when !received server_no_context_takeover',
+    );
+
+    ok(
+        !$pmd->inflate_no_context_takeover(),
+        '… but the consuming object is altered',
     );
 
     $pmd = Net::WebSocket::PMCE::deflate::Client->new( inflate_no_context_takeover => 1 );
