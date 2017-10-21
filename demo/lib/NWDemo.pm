@@ -76,7 +76,7 @@ sub set_signal_handlers_for_server {
         $SIG{$sig} = sub {
             my ($the_sig) = @_;
 
-            my $code = ($the_sig eq 'INT') ? 'ENDPOINT_UNAVAILABLE' : 'SERVER_ERROR';
+            my $code = ($the_sig eq 'INT') ? 'ENDPOINT_UNAVAILABLE' : 'INTERNAL_ERROR';
 
             my $frame = Net::WebSocket::Frame::close->new(
                 code => $code,
