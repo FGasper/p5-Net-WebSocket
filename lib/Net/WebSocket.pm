@@ -76,15 +76,14 @@ fit your project with minimal overhead. There are some examples
 of how you might write complete applications (client or server)
 in the distribution’s F<demo/> directory.
 
-Net::WebSocket is not a “quick” WebSocket solution; L<Mojolicious> and
-the like fill that role amply.
-Net::WebSocket’s purpose is to support anything
+Net::WebSocket emphasizes flexibility and lightness rather than the more
+monolithic approach in modules like L<Mojolicious>.
+Net::WebSocket should support anything
 that the WebSocket protocol itself can do, as lightly as possible and without
 prejudice as to how you want to do it: extensions, blocking/non-blocking I/O,
 arbitrary HTTP headers, etc. Net::WebSocket will likely require more of an
-investment up-front, but its flexibility should allow it to do anything that
-can be done with WebSocket, and much more cleanly than a more “monolithic”
-solution would likely allow.
+investment up-front, but the end result should be a clean, light
+implementation that will grow (or shrink!) as your needs dictate.
 
 =head1 OVERVIEW
 
@@ -96,24 +95,25 @@ Here are the main modules:
 
 =item L<Net::WebSocket::Handshake::Client>
 
-Logic for handshakes. These are probably most useful in tandem with
-modules like L<HTTP::Request> and L<HTTP::Response>.
+Logic for handshakes. Every application needs one of these. As of version
+0.5 this handles all headers and can also do
+subprotocol and extension negotiation for you.
 
+=item L<Net::WebSocket::HTTP_R>
+
+A thin convenience wrapper for L<HTTP::Request> and L<HTTP::Response>,
+CPAN’s “standard” classes to represent HTTP requests and responses.
+Net::WebSocket::HTTP_R should also work with other classes whose
+interfaces are compatible with these “standard” ones.
 
 =item L<Net::WebSocket::Endpoint::Server>
 
 =item L<Net::WebSocket::Endpoint::Client>
 
-The highest-level abstraction that this distribution provides. It parses input
-and responds to control frames and timeouts. You can use this to receive
-streamed (i.e., fragmented) transmissions as well.
-
-=item L<Net::WebSocket::Streamer::Server>
-
-=item L<Net::WebSocket::Streamer::Client>
-
-Useful for sending streamed (fragmented) data rather than
-a full message in a single frame.
+A high-level abstraction to parse input
+and respond to control frames and timeouts. You can use this to receive
+streamed (i.e., fragmented) transmissions as well. You don’t have to use
+this module, but it will make your life easier.
 
 =item L<Net::WebSocket::Parser>
 
@@ -126,6 +126,13 @@ Useful for creating raw frames. For data frames (besides continuation),
 these will be your bread-and-butter. See L<Net::WebSocket::Frame::text>
 for sample usage.
 
+=item L<Net::WebSocket::Streamer::Server>
+
+=item L<Net::WebSocket::Streamer::Client>
+
+Useful for sending streamed (fragmented) data rather than
+a full message in a single frame.
+
 =back
 
 =head1 IMPLEMENTATION NOTES
@@ -134,11 +141,13 @@ for sample usage.
 
 WebSocket uses regular HTTP headers for its handshakes. Because there are
 many different solutions around for parsing HTTP headers, Net::WebSocket
-tries to be “agnostic” about how that’s done. The liability of this is
-that you, the library user, will need to implement some of the handshake
-logic yourself. If you’re building from the ground up that’s not a lot of
-fun, but if you’ve already got a solution in place for parsing headers then
-Net::WebSocket can fit into that quite easily.
+is “agnostic” about how that’s done. The advantage is that if you’ve got
+a custom solution for parsing headers then Net::WebSocket can fit into
+that quite easily.
+
+The liability of this is that you, the library user, must give headers
+directly to your Handshake object. (NB: L<Net::WebSocket::HTTP_R> might
+be able to do this for you.)
 
 =head2 Masking
 
@@ -200,14 +209,20 @@ can do in your application.
 
 =back
 
+=head2 permessage-deflate
+
+Net::WebSocket 0.5 introduces support for the permessage-delate extension
+to allow compressed messages over WebSocket. See
+L<Net::WebSocket::PMCE::deflate> for more details.
+
 =head1 TODO
+
+At this point Net::WebSocket should support every widely implemented
+WebSocket feature.
 
 =over
 
-=item * Support the L<permessage-deflate|https://tools.ietf.org/html/rfc7692>
-extension natively.
-
-=item * Add tests, especially for extension support.
+=item * Add more tests.
 
 =back
 

@@ -34,6 +34,10 @@ use constant STATUS => {
     POLICY_VIOLATION       => 1008,
     MESSAGE_TOO_BIG        => 1009,
     UNSUPPORTED_EXTENSIONS => 1010,
+
+    #Post-RFC, “server error” was changed to “internal error”.
+    #We accept both names; code-to-name conversion always returns this one.
+    INTERNAL_ERROR         => 1011,
     SERVER_ERROR           => 1011,
 
     #RFC says not to use this one,
