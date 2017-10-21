@@ -17,7 +17,11 @@ my $streamer = $data->create_streamer( 'Net::WebSocket::Frame::text' );
 my (@pieces, @frames);
 
 while (@frames < 2) {
-    my $piece = join( q<>, map { substr( rand, 2 ) } 1 .. 5000 );
+    my $piece = join( q<>, map {
+        my $rand = rand;
+        die 'rand() is undefined!' if !defined $rand;
+        $rand && substr( rand, 2 );
+    } 1 .. 5000 );
 
     push @pieces, $piece;
 

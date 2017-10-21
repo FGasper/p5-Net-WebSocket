@@ -58,7 +58,11 @@ sub status_name_to_code {
 sub status_code_to_name {
     my ($code) = @_;
 
-    %status_code_name = reverse %{ STATUS() } if !%status_code_name;
+    if (!%status_code_name) {
+        my %copy = %{ STATUS() };
+        delete $copy{'SERVER_ERROR'};
+        %status_code_name = reverse %copy;
+    }
 
     return $status_code_name{$code};
 }
