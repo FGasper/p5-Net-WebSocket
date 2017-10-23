@@ -209,21 +209,25 @@ sub _valid_headers_or_die {
 sub _consume_peer_header {
     my ($self, $name => $value) = @_;
 
-    for my $hdr_part ( qw( Accept Protocol Extensions ) ) {
-        if ($name eq "Sec-WebSocket-$hdr_part") {
+    my $orig_name = $name;
+
+    $name =~ tr<A-Z><a-z>;  #case insensitivity
+
+    for my $hdr_part ( qw( accept protocol extensions ) ) {
+        if ($name eq "sec-websocket-$hdr_part") {
             if ( exists $self->{"_got_$name"} ) {
-                die Net::WebSocket::X->create('DuplicateHeader', $name, $self->{"_got_$name"}, $value);
+                die Net::WebSocket::X->create('DuplicateHeader', $orig_name, $self->{"_got_$name"}, $value);
             }
 
             $self->{"_got_$name"} = $value;
         }
     }
 
-    if ($name eq 'Sec-WebSocket-Accept') {
+    if ($name eq 'sec-websocket-accept') {
         $self->validate_accept_or_die($value);
         $self->{'_accept_header_ok'} = 1;
     }
-    elsif ($name eq 'Sec-WebSocket-Protocol') {
+    elsif ($name eq 'sec-websocket-protocol') {
         if (!grep { $_ eq $value } @{ $self->{'subprotocols'} }) {
             die Net::WebSocket::X->create('UnknownSubprotocol', $value);
         }

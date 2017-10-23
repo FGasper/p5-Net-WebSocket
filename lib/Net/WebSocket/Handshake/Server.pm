@@ -77,17 +77,19 @@ sub valid_method_or_die {
 sub _consume_peer_header {
     my ($self, $name => $value) = @_;
 
-    if ($name eq 'Sec-WebSocket-Version') {
+    $name =~ tr<A-Z><a-z>;  #case insensitive
+
+    if ($name eq 'sec-websocket-version') {
         if ( $value ne Net::WebSocket::Constants::PROTOCOL_VERSION() ) {
             die Net::WebSocket::X->new('BadHeader', 'Sec-WebSocket-Version', $value, 'Unsupported protocol version; must be ' . Net::WebSocket::Constants::PROTOCOL_VERSION());
         }
 
         $self->{'_version_ok'} = 1;
     }
-    elsif ($name eq 'Sec-WebSocket-Key') {
+    elsif ($name eq 'sec-websocket-key') {
         $self->{'key'} = $value;
     }
-    elsif ($name eq 'Sec-WebSocket-Protocol') {
+    elsif ($name eq 'sec-websocket-protocol') {
         Module::Load::load('Net::WebSocket::HTTP');
 
         for my $token ( Net::WebSocket::HTTP::split_tokens($value) ) {
