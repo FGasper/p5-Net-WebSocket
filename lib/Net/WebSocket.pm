@@ -31,7 +31,6 @@ Net::WebSocket - WebSocket in Perl
     #See below about IO::Framed
     my $parser = Net::WebSocket::Parser->new(
         IO::Framed::Read->new($inet),
-        $leftover_from_header_read,     #can be nonempty on the client
     );
 
     my $iof_w = IO::Framed::Write->new($inet);
