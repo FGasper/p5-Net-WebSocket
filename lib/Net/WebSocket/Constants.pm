@@ -16,6 +16,7 @@ use constant {
     PROTOCOL_VERSION => 13,
     REQUIRED_HTTP_METHOD => 'GET',
     REQUIRED_HTTP_STATUS => 101,
+    REQUIRED_REQUEST_PROTOCOL => 'HTTP/1.1',
 };
 
 #These names are taken from:

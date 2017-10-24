@@ -44,6 +44,7 @@ save a bit of time.
 sub handshake_consume_request {
     my ($hsk, $req) = @_;
 
+    $hsk->valid_protocol_or_die( $req->protocol() );
     $hsk->valid_method_or_die( $req->method() );
 
     return _handshake_consume_common($hsk, $req);

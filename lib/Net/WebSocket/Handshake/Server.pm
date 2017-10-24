@@ -45,22 +45,40 @@ use Net::WebSocket::X ();
 #no-op
 use constant _handle_unrecognized_extension => ();
 
-=head1 METHODS
-
 =head2 I<CLASS>->new( %OPTS )
 
 Returns an instance of this class. %OPTS is as described in the base class;
 there are no options specific to this class.
+
+=head2 I<OBJ>->valid_protocol_or_die( PROTOCOL )
+
+Throws an exception if the given PROTOCOL isn’t the HTTP protocol (HTTP/1.1)
+that WebSocket requires for all requests.
+
+You only need this if if you’re not using a request-parsing interface
+that’s compatible with L<HTTP::Request>; otherwise,
+L<Net::WebSocket::HTTP_R>’s C<handshake_consume_request()> function
+will do this (and other niceties) for you.
+
+=cut
+
+sub valid_protocol_or_die {
+    my ($self, $protocol) = @_;
+
+    if ($protocol ne Net::WebSocket::Constants::REQUIRED_REQUEST_PROTOCOL()) {
+        die Net::WebSocket::X->new('BadRequestProtocol', $protocol);
+    }
+
+    return;
+}
 
 =head2 I<OBJ>->valid_method_or_die( METHOD )
 
 Throws an exception if the given METHOD isn’t the HTTP method (GET) that
 WebSocket requires for all requests.
 
-You only need this if if you’re not using a request-parsing interface
-that’s compatible with L<HTTP::Request>; otherwise,
-L<Net::WebSocket::HTTP_R>’s C<handshake_consume_request()> function
-will do this (and other niceties) for you.
+As with C<valid_protocol_or_die()>, L<Net::WebSocket::HTTP_R> might
+call this method for you.
 
 =cut
 

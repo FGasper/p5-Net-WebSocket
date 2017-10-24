@@ -111,6 +111,14 @@ sub get_subprotocol {
 #    return { %{ $self->{'_match_extensions'} } };
 #}
 
+=head2 I<OBJ>->consume_headers( HDR1 => VAL1, HDR2 => VAL2, .. )
+
+The “workhorse” method of this base class. Takes in the HTTP headers
+and verifies that the look as they should, setting this object’s own
+internals as appropriate.
+
+=cut
+
 sub consume_headers {
     my ($self, @kv_pairs) = @_;
 
