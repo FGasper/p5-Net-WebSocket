@@ -10,6 +10,8 @@ use IO::SigGuard ();
 
 use Net::WebSocket::Handshake::Server ();
 use Net::WebSocket::Frame::close ();
+use Net::WebSocket::PMCE::deflate::Server ();
+use Net::WebSocket::HTTP_R ();
 
 use constant MAX_CHUNK_SIZE => 64000;
 
@@ -26,43 +28,43 @@ sub get_server_handshake_from_text {
 
     my $req = HTTP::Request->parse($hdrs_txt);
 
-    my $method = $req->method();
-    die "Must be GET, not “$method” ($hdrs_txt)" if $method ne 'GET';
+    my $pmd = Net::WebSocket::PMCE::deflate::Server->new();
 
-    #Forgo validating headers. Life’s too short, and it’s a demo.
-
-    my $key = $req->header('Sec-WebSocket-Key');
-
-    return (
-        $req,
-        Net::WebSocket::Handshake::Server->new(
-            key => $key,
-        ),
+    my $hsk = Net::WebSocket::Handshake::Server->new(
+        extensions => [$pmd],
     );
+
+    Net::WebSocket::HTTP_R::handshake_consume_request( $hsk, $req );
+
+    my $pmd_data = $pmd->ok_to_use() && $pmd->create_data_object();
+
+    return ($req, $hsk, $pmd_data || ());
 }
 
 sub handshake_as_server {
     my ($inet, $req_handler) = @_;
 
     my $buf = q<>;
-    my ($req, $hsk);
-    while ( IO::SigGuard::sysread($inet, $buf, MAX_CHUNK_SIZE, length $buf ) ) {
-        ($req, $hsk) = get_server_handshake_from_text($buf);
+    my ($req, $hsk, $pmd_data);
+
+    my $count;
+    while ( $count = IO::SigGuard::sysread($inet, $buf, MAX_CHUNK_SIZE, length $buf ) ) {
+        ($req, $hsk, $pmd_data) = get_server_handshake_from_text($buf);
         last if $hsk;
     }
 
-    die "read(): $!" if $!;
+    die "read(): $!" if !defined $count;
 
-    my $hdr_text = $hsk->create_header_text();
+    my $hdr_text = $hsk->to_string();
 
     my @extra_headers;
     if ($req_handler) {
-        $hdr_text .= $_ . CRLF for $req_handler->($req);
+        substr( $hdr_text, -2, 0 ) = $_ . CRLF for $req_handler->($req, $hsk);
     }
 
-    print { $inet } $hdr_text . CRLF or die "send(): $!";
+    print { $inet } $hdr_text or die "send(): $!";
 
-    return;
+    return $pmd_data;
 }
 
 use constant ERROR_SIGS => qw( INT HUP QUIT ABRT USR1 USR2 SEGV ALRM TERM );
@@ -74,13 +76,13 @@ sub set_signal_handlers_for_server {
         $SIG{$sig} = sub {
             my ($the_sig) = @_;
 
-            my $code = ($the_sig eq 'INT') ? 'ENDPOINT_UNAVAILABLE' : 'SERVER_ERROR';
+            my $code = ($the_sig eq 'INT') ? 'ENDPOINT_UNAVAILABLE' : 'INTERNAL_ERROR';
 
             my $frame = Net::WebSocket::Frame::close->new(
                 code => $code,
             );
 
-            print { $inet } $frame->to_bytes();
+            print { $inet } $frame->to_bytes() or warn "send close: $!";
 
             $SIG{$the_sig} = 'DEFAULT';
 

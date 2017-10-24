@@ -25,10 +25,16 @@ use Net::WebSocket::Frame::close  ();
 use Net::WebSocket::Handshake::Client ();
 use Net::WebSocket::Parser ();
 
+use Net::WebSocket::PMCE::deflate::Client ();
+
+use Net::WebSocket::HTTP_R ();
+
 use constant {
     MAX_CHUNK_SIZE => 64000,
     CRLF => "\x0d\x0a",
-    DEBUG => 1,
+    DEBUG => 0,
+
+    SEND_FRAME_CLASS => 'Net::WebSocket::Frame::binary',
 };
 
 #No PIPE
@@ -38,6 +44,8 @@ run( @ARGV ) if !caller;
 
 sub run {
     my ($uri) = @_;
+
+    local $SIG{'PIPE'} = 'IGNORE';
 
     -t \*STDIN or die "STDIN must be a TTY for this demo.\n";
 
@@ -107,6 +115,10 @@ sub run {
 
     my $handshake;
 
+    my $deflate = Net::WebSocket::PMCE::deflate::Client->new();
+    my $deflate_hsk = $deflate->get_handshake_object();
+    my $deflate_data;
+
     $handle = IO::Events::Handle->new(
         owner => $loop,
         handle => $inet,
@@ -120,11 +132,13 @@ sub run {
 
             $handshake = Net::WebSocket::Handshake::Client->new(
                 uri => $uri,
+                extensions => [$deflate],
             );
 
-            my $hdr = $handshake->create_header_text();
+            my $hdr = $handshake->to_string();
+            DEBUG && print "SENDING HEADERS:\n$hdr";
 
-            $self->write( $hdr . CRLF );
+            $self->write( $hdr );
 
             $sent_handshake = 1;
         },
@@ -142,21 +156,17 @@ sub run {
 
                 my $hdrs_txt = $read_obj->read( $idx + 2 * length(CRLF) );
 
-                my $req = HTTP::Response->parse($hdrs_txt);
+                DEBUG && print "HEADERS:\n$hdrs_txt\n";
+                my $resp = HTTP::Response->parse($hdrs_txt);
 
-                my $code = $req->code();
-                die "Must be 101, not “$code”" if $code != 101;
+                Net::WebSocket::HTTP_R::handshake_consume_response(
+                    $handshake,
+                    $resp,
+                );
 
-                my $upg = $req->header('upgrade');
-                $upg =~ tr<A-Z><a-z>;
-                die "“Upgrade” must be “websocket”, not “$upg”!" if $upg ne 'websocket';
-
-                my $conn = $req->header('connection');
-                $conn =~ tr<A-Z><a-z>;
-                die "“Upgrade” must be “upgrade”, not “$conn”!" if $conn ne 'upgrade';
-
-                my $accept = $req->header('Sec-WebSocket-Accept');
-                $handshake->validate_accept_or_die($accept);
+                if ( $deflate->ok_to_use() ) {
+                    $deflate_data = $deflate->create_data_object();
+                }
 
                 $got_handshake = 1;
             }
@@ -173,12 +183,13 @@ sub run {
 
                 $payload = $msg->get_payload();
 
-                syswrite( \*STDOUT, substr( $payload, 0, 64, q<> ) ) while length $payload;
-            }
+                if ($deflate_data && $deflate_data->message_is_compressed($msg)) {
+                    $payload = $deflate_data->decompress($payload);
+                }
 
-            #Handle any control frames we might need to write out.
-            while ( my $msg = $ept->get_next_message() ) {
-                $self->write($msg->to_bytes());
+                while (length $payload) {
+                    syswrite( \*STDOUT, substr( $payload, 0, 65536, q<> ) ) or die "write(STDOUT): $!";
+                }
             }
 
             $timeout->start();
@@ -193,15 +204,28 @@ sub run {
         on_read => sub {
             my ($self) = @_;
 
-            my $frame = Net::WebSocket::Frame::binary->new(
-                payload_sr => \$self->read(),
-                mask => Net::WebSocket::Mask::create(),
-            );
+            my $frame;
+
+            if ($deflate_data) {
+                $frame = $deflate_data->create_message(
+                    SEND_FRAME_CLASS(),
+                    $self->read(),
+                );
+            }
+            else {
+                $frame = SEND_FRAME_CLASS()->new(
+                    payload_sr => \$self->read(),
+                    mask => Net::WebSocket::Mask::create(),
+                );
+            }
 
             $handle->write($frame->to_bytes());
         },
 
         on_close => sub {
+            $ept->shutdown( code => 'SUCCESS' );
+            $handle->flush();
+
             $closed = 1;
         },
 
@@ -214,11 +238,9 @@ sub run {
         $SIG{$sig} = sub {
             my ($the_sig) = @_;
 
-            my $code = ($the_sig eq 'INT') ? 'SUCCESS' : 'ENDPOINT_UNAVAILABLE';
+            my $code = 'ENDPOINT_UNAVAILABLE';
 
             $ept->shutdown( code => $code );
-
-            local $SIG{'PIPE'} = 'IGNORE';
             $handle->flush();
 
             $SIG{$the_sig} = 'DEFAULT';

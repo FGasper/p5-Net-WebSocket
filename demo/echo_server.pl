@@ -24,11 +24,12 @@ use NWDemo ();
 use Net::WebSocket::Endpoint::Server ();
 use Net::WebSocket::Frame::text ();
 use Net::WebSocket::Frame::binary ();
-use Net::WebSocket::Frame::continuation ();
 use Net::WebSocket::Handshake::Server ();
 use Net::WebSocket::Parser ();
 
-use Net::WebSocket::Handshake::Extension ();
+use Net::WebSocket::PMCE::deflate::Server ();
+
+$SIG{'PIPE'} = 'IGNORE';
 
 my $host_port = $ARGV[0] || die "Need host:port or port!\n";
 
@@ -59,28 +60,7 @@ while ( my $sock = $server->accept() ) {
 
     my @exts;
 
-    NWDemo::handshake_as_server(
-        $sock,
-        sub {
-            my ($req) = @_;
-
-            my $exts = $req->header('Sec-WebSocket-Extensions');
-            return if !defined $exts;
-
-            #a list of strings
-            my @extensions = ref($exts) ? @$exts : ($exts);
-
-            #now it’s a list of objects
-            @extensions = map { Net::WebSocket::Handshake::Extension->parse_string($_) } @extensions;
-
-            for my $ext (@extensions) {
-                my @params = $ext->parameters();
-                printf "Requested extension: %s\n", $ext->to_string();
-            }
-
-            return;
-        },
-    );
+    my $deflate_data = NWDemo::handshake_as_server( $sock );
 
     NWDemo::set_signal_handlers_for_server($sock);
 
@@ -133,16 +113,54 @@ while ( my $sock = $server->accept() ) {
             #If this returns falsey, whether we get undef or q<>
             #we react the same way.
             if ( $msg ) {
+                my $frame_class = 'Net::WebSocket::Frame::' . $msg->get_type();
+                my $answer_f;
+
                 my $payload = $msg->get_payload();
 
-                my $answer_f = 'Net::WebSocket::Frame::' . $msg->get_type();
-                $answer_f = $answer_f->new(
-                    payload_sr => \$payload,
-                );
+                if ($deflate_data) {
+                    if ($deflate_data->message_is_compressed($msg)) {
+                        $payload = $deflate_data->decompress( $msg->get_payload() );
+                    }
 
-                my $answer = Net::WebSocket::Message::create_from_frames($answer_f);
+                    if ( rand > 0.5 ) {
 
-                $framed_obj->write( $answer->to_bytes() );
+                        my $streamer = $deflate_data->create_streamer($frame_class);
+
+                        while ( length($payload) > 1 ) {
+                            $answer_f = $streamer->create_chunk(
+                                substr( $payload, 0, 1, q<> ),
+                            );
+
+                            if ($answer_f) {
+                                $framed_obj->write( $answer_f->to_bytes() );
+                            }
+                        }
+
+                        $answer_f = $streamer->create_final($payload);
+                    }
+                    else {
+                        $answer_f = $deflate_data->create_message(
+                            $frame_class,
+                            $payload,
+                        );
+                    }
+                }
+                else {
+                    $answer_f = $frame_class->new(
+                        payload_sr => \$payload,
+                    );
+                }
+
+                $framed_obj->write( $answer_f->to_bytes() );
+            }
+            else {
+                my $close = $ept->received_close_frame();
+
+                if ($close) {
+                    my ($code, $reason) = $close->get_code_and_reason();
+                    printf STDERR "Got CLOSE ($code:$reason)\n";
+                }
             }
         }
     }

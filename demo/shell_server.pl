@@ -29,8 +29,11 @@ use Net::WebSocket::Endpoint::Server ();
 use Net::WebSocket::Frame::text ();
 use Net::WebSocket::Frame::binary ();
 use Net::WebSocket::Frame::continuation ();
-use Net::WebSocket::Handshake::Server ();
 use Net::WebSocket::Parser ();
+
+use constant {
+    SEND_FRAME_CLASS => 'Net::WebSocket::Frame::binary',
+};
 
 use IO::Pty ();
 
@@ -107,6 +110,8 @@ my $server = IO::Events::Socket::TCP->new(
             },
         );
 
+        my $deflate;
+
         $client_hdl = shift()->accept(
             owner => $loop,
             read => 1,
@@ -130,7 +135,13 @@ my $server = IO::Events::Socket::TCP->new(
                         #printf STDERR ">>>>> from browser: %v.02x\n", $msg->get_payload();
                         #print STDERR _printable( $msg->get_payload() ) . $/;
 
-                        $shell_hdl->write( $msg->get_payload() );
+                        my $payload = $msg->get_payload();
+
+                        if ($deflate && $deflate->message_is_compressed($msg)) {
+                            $payload = $deflate->decompress($payload);
+                        }
+
+                        $shell_hdl->write( $payload );
                     }
                 }
                 else {
@@ -141,7 +152,7 @@ my $server = IO::Events::Socket::TCP->new(
                         out => $client_hdl,
                     );
 
-                    my $hsk = NWDemo::get_server_handshake_from_text($read_obj->get());
+                    (undef, my $hsk, $deflate) = NWDemo::get_server_handshake_from_text($read_obj->get());
                     return if !$hsk;
 
                     #Clear out $read_obj’s buffer.
@@ -149,7 +160,7 @@ my $server = IO::Events::Socket::TCP->new(
 
                     #----------------------------------------------------------------------
 
-                    $client_hdl->write( $hsk->create_header_text() . "\x0d\x0a" );
+                    $client_hdl->write( $hsk->to_string() );
                     $did_handshake = 1;
 
                     my $pty = IO::Pty->new();
@@ -195,17 +206,28 @@ my $server = IO::Events::Socket::TCP->new(
                         on_read => sub {
                             my ($self) = @_;
 
-                            #Needs to be binary in case of ZMODEM transfer.
-                            my $frame = Net::WebSocket::Frame::binary->new(
-                                payload_sr => \$self->read(),
-                            );
+                            my $frame_or_msg;
+
+                            if ($deflate) {
+                                $frame_or_msg = $deflate->create_message(
+                                    SEND_FRAME_CLASS(),
+                                    $self->read(),
+                                );
+                            }
+                            else {
+
+                                #Needs to be binary in case of ZMODEM transfer.
+                                $frame_or_msg = SEND_FRAME_CLASS()->new(
+                                    payload_sr => \$self->read(),
+                                );
+                            }
 
                             #printf STDERR "to client: %s\n", ($frame->to_bytes() =~ s<([\x80-\xff])><sprintf '\x%02x', ord $1>gre);
                             #printf STDERR "<<<<< to client: %v.02x\n", $frame->get_payload();
                             #printf STDERR "<<<<< to client: %d\n", length $frame->get_payload();
                             #print STDERR _printable( $frame->get_payload() ) . $/;
 
-                            $client_hdl->write($frame->to_bytes());
+                            $client_hdl->write($frame_or_msg->to_bytes());
                         },
 
                         pid => $cpid,
