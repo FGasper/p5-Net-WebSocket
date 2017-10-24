@@ -80,7 +80,7 @@ Revision history for Perl module Net::WebSocket
 
 - Replace more plain exceptions with objects
 
-0.05
+0.05 Tue Oct 24 2017
 - PMCE support, including permessage-deflate
 
 - Major revamp of handshake logic: Net::WebSocket can now handle
