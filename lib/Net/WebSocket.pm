@@ -1,6 +1,6 @@
 package Net::WebSocket;
 
-our $VERSION = '0.05';
+our $VERSION = '0.051';
 
 =encoding utf-8
 
