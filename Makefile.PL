@@ -22,7 +22,7 @@ WriteMakefile1(
     LICENSE      => 'perl',
 
     #Bleh. Hopefully can add support for older versions.
-    MIN_PERL_VERSION => 5.014000,
+    MIN_PERL_VERSION => 5.010000,
 
     PREREQ_PM    => {
         'autodie'                  => 0,
