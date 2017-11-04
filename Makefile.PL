@@ -45,7 +45,7 @@ WriteMakefile1(
         'Time::HiRes' => 0,
         'File::Temp' => 0,
         'File::Slurp' => 0,
-        'IO::Framed' => 0,
+        'IO::Framed' => 0.03,
         'IO::Select' => 0,
         ( $^O eq 'MSWin32' ? ('Win32::Socketpair' => 0.02) : () ),
     },
