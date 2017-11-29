@@ -29,7 +29,7 @@ WriteMakefile1(
         'X::Tiny'   => 0,
         'Module::Load'  => 0,
         'MIME::Base64' => 0,
-        'Digest::SHA' => 0,
+        'Digest::SHA1' => 0,
         'URI::Split' => 0,
         'Call::Context' => 0,
         'HTTP::Headers::Util' => 0,
