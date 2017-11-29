@@ -15,8 +15,6 @@ See L<Net::WebSocket::Endpoint::Server>.
 use strict;
 use warnings;
 
-use Call::Context ();
-
 use Net::WebSocket::Frame::close ();
 use Net::WebSocket::Frame::ping ();
 use Net::WebSocket::Frame::pong ();

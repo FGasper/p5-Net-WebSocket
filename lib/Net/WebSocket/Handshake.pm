@@ -103,14 +103,6 @@ sub get_subprotocol {
     return $self->{'_subprotocol'};
 }
 
-#sub get_match_extensions {
-#    my $self = shift;
-#
-#    Call::Context::must_be_list();
-#
-#    return { %{ $self->{'_match_extensions'} } };
-#}
-
 =head2 I<OBJ>->consume_headers( HDR1 => VAL1, HDR2 => VAL2, .. )
 
 The “workhorse” method of this base class. Takes in the HTTP headers
