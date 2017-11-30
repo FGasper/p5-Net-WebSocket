@@ -1,6 +1,6 @@
 package Net::WebSocket;
 
-our $VERSION = '0.054';
+our $VERSION = '0.06-TRIAL1';
 
 =encoding utf-8
 
@@ -41,7 +41,7 @@ Net::WebSocket - WebSocket in Perl
     );
 
     $iof_w->write(
-        Net::WebSocket::Frame::text->new( payload_sr => \'Hello, world' )
+        Net::WebSocket::Frame::text->new( payload => 'Hello, world' )
     );
 
     #Determine that $inet can be read from …

@@ -100,3 +100,7 @@ the entire handshake.
 0.054 Wed Nov 29 2017
 - Use Digest::SHA1 instead of Digest::SHA (SHA1 is lighter)
 - Tweak Makefile.PL dependencies
+
+0.06 Thu Nov 30 2017
+- Normalize naming conventions for frame classes.
+- Have frames receive “payload” instead of “payload_sr”.
