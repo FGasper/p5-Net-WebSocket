@@ -29,24 +29,10 @@ Net::WebSocket::Endpoint::Server
     }
     else {
 
-        #Only necessary for non-blocking I/O;
-        #it’s meaningless in blocking I/O.
-        #See below for an alternative pattern for use with POE, etc.
-        if ( $ept->get_write_queue_size() ) {
-            $ept->flush_write_queue();
-        }
-
         #This should only be called when reading won’t produce an error.
         #For example, in non-blocking I/O you’ll need a select() in front
         #of this. (Blocking I/O can just call it and wait!)
         $ept->get_next_message();
-
-        #INSTEAD OF flush_write_queue(), you might want to send the write
-        #queue off to a multiplexing framework like POE, for which this
-        #would be useful:
-        while ( my $frame = $ept->shift_write_queue() ) {
-            #… do something with $frame->to_bytes() -- probably send it
-        }
 
         #Check for this at the end of each cycle.
         _custom_logic_to_finish_up() if $ept->is_closed();
@@ -95,8 +81,18 @@ If you want to avoid buffering a large message, you can do this:
 
 =head2 I<OBJ>->get_next_message()
 
-The “workhorse” method. It returns a data message if one is available
-and is the next frame; otherwise, it returns undef.
+The “workhorse” method. It returns one of the following:
+
+=over
+
+=item * a data message if one is available
+
+=item * empty string if the Parser’s C<get_next_frame()> indicated
+end-of-file without an exception
+
+=item * otherwise, undef
+
+=back
 
 This method also handles control frames that arrive before or among
 message frames:
@@ -108,9 +104,7 @@ See below for more information.
 
 =item * ping: Send the appropriate pong frame.
 
-=item * pong: Set the internal ping counter to zero. If the pong is
-unrecognized (i.e., we’ve not sent the payload in a ping), then we send
-a PROTOCOL_ERROR close frame.
+=item * pong: As per the protocol specification.
 
 =back
 
