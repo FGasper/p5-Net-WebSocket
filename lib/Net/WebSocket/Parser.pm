@@ -45,6 +45,18 @@ L<IO::Framed::X::ReadError>.
 
 Again, you can use an equivalent interface for frame chunking if you wish.
 
+=head1 CONCERNING EMPTY READS
+
+An empty read is how we detect that a file handle (or socket, etc.) has no
+more data to read. Generally we shouldn’t get this in WebSocket since it
+means that a peer endpoint has gone away without sending a close frame.
+It is thus recommended that applications regard an empty read on a WebSocket
+stream as an error condition; e.g., if you’re using L<IO::Framed::Read>,
+you should NOT enable the C<allow_empty_read()> behavior.
+
+Nevertheless, this module (and L<Net::WebSocket::Endpoint>) do work when
+that flag is enabled.
+
 =head1 CUSTOM FRAMES SUPPORT
 
 To support reception of custom frame types you’ll probably want to subclass
