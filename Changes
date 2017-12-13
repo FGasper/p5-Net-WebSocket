@@ -117,3 +117,6 @@ the entire handshake.
 - Remove more old/inaccurate documentation in Endpoint.pm.
 - Clarify (intended) divergence from RFC vis-à-vis 1005 status codes.
 - Document do_not_die_on_close().
+
+0.063 Wed Dec 13 2017
+- Fix frame ->to_bytes() logic for large frames on 32-bit perls.
