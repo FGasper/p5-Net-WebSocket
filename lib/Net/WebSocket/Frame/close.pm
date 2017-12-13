@@ -38,7 +38,8 @@ close messages can have any of:
 
 =item * no code, and no reason
 
-Returned as undef (for the code) and an empty string.
+Returned as undef (for the code) and an empty string. (This diverges
+from the RFC’s described behavior of returning code 1005.)
 
 =item * a code, and no reason
 
