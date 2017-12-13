@@ -38,8 +38,7 @@ close messages can have any of:
 
 =item * no code, and no reason
 
-Returned as the number that corresponds to C<EMPTY_CLOSE> (see below)
-and an empty string.
+Returned as undef (for the code) and an empty string.
 
 =item * a code, and no reason
 
@@ -63,12 +62,6 @@ constants that derive from L<Microsoft’s WebSocket API|https://msdn.microsoft.
 =item * C<PROTOCOL_ERROR> (1002)
 
 =item * C<INVALID_DATA_TYPE> (1003)
-
-=item * C<EMPTY_CLOSE> (1005)
-
-This code is special in that it’s not actually sent over the wire.
-As per the RFC, though, C<get_code_and_reason()> returns it as the
-status when no status is assigned in a close frame.
 
 =item * C<INVALID_PAYLOAD> (1007)
 
@@ -129,12 +122,7 @@ sub new {
 
         if (my $code = delete $opts{'code'}) {
             my $num = Net::WebSocket::Constants::status_name_to_code($code);
-            if ($num) {
-                if ($num == Net::WebSocket::Constants::status_name_to_code('EMPTY_CLOSE')) {
-                    die Net::WebSocket::X->create('BadArg', 'code', $code, 'Invalid WebSocket status code');
-                }
-            }
-            else {
+            if (!$num) {
                 $num = $code;
 
                 if ($num !~ m<\A[0-9]{4}\z> ) {

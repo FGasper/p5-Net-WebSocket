@@ -30,7 +30,7 @@ use constant STATUS => {
     INVALID_DATA_TYPE      => 1003,
 
     #These are never actually sent.
-    EMPTY_CLOSE            => 1005,
+    #EMPTY_CLOSE            => 1005,
     #ABORTED_CLOSE          => 1006,
 
     INVALID_PAYLOAD        => 1007,
