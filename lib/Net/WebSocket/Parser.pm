@@ -224,7 +224,7 @@ sub get_next_frame {
         $class;
     };
 
-    return $frame_class->create_from_parse(\$first2, \$len_len, \$mask_buf, \$payload);
+    return $frame_class->create_from_parse(\$first2, \$len_buf, \$mask_buf, \$payload);
 }
 
 #This will only return exactly the number of bytes requested.
