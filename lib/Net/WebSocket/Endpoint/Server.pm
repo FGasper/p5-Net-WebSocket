@@ -138,6 +138,19 @@ DEPRECATED: Returns 1 or 0 to indicate whether we have sent a close frame.
 Note that C<sent_close_frame()> provides a more useful variant of the
 same functionality; there is no good reason to use this method anymore.
 
+=head2 I<OBJ>->do_not_die_on_close()
+
+Ordinarily, receipt of a close frame prompts an exception after the
+response close frame is sent. This is, arguably, a suboptimal design
+choice since receipt of a close frame is a perfectly normal thing to happen;
+i.e., it’s not “exception-al”. If you want to check for close yourself
+instead, you can do so by calling this method.
+
+=head2 I<OBJ>->die_on_close()
+
+The inverse of C<do_not_die_on_close()>: restores
+the default behavior when a close frame is received.
+
 =head1 WHEN A CLOSE FRAME IS RECEIVED
 
 C<get_next_message()> will automatically send a close frame in response

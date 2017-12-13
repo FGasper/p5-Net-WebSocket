@@ -38,8 +38,8 @@ close messages can have any of:
 
 =item * no code, and no reason
 
-Returned as undef (for the code) and an empty string. (This diverges
-from the RFC’s described behavior of returning code 1005.)
+Returned as undef (for the code) and an empty string. This diverges
+from the RFC’s described behavior of returning code 1005.
 
 =item * a code, and no reason
 
@@ -112,6 +112,7 @@ use parent qw(
 use Call::Context ();
 
 use Net::WebSocket::Constants ();
+use Net::WebSocket::X ();
 
 use constant get_opcode => 8;
 
@@ -170,10 +171,7 @@ sub get_code_and_reason {
     }
 
     if (!length ${ $self->[$self->PAYLOAD] }) {
-        return (
-            Net::WebSocket::Constants::status_name_to_code('EMPTY_CLOSE'),
-            q<>,
-        );
+        return ( undef, q<> );
     }
 
     return unpack 'na*', $self->get_payload();
