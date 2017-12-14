@@ -1,6 +1,6 @@
 package Net::WebSocket;
 
-our $VERSION = '0.063-TRIAL1';
+our $VERSION = '0.063';
 
 =encoding utf-8
 
@@ -214,8 +214,8 @@ L<Net::WebSocket::PMCE::deflate> for more details.
 
 =head1 TODO
 
-At this point Net::WebSocket should support every widely implemented
-WebSocket feature.
+At this point Net::WebSocket seems to support everything the WebSocket
+protocol can (usefully) do, including compression.
 
 =over
 
