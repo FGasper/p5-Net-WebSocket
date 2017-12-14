@@ -109,6 +109,9 @@ The “workhorse” method of this base class. Takes in the HTTP headers
 and verifies that the look as they should, setting this object’s own
 internals as appropriate.
 
+This will throw an appropriate exception if any header is missing
+or otherwise invalid.
+
 =cut
 
 sub consume_headers {
@@ -117,10 +120,11 @@ sub consume_headers {
     $self->{'_no_use_legacy'} = 1;
 
     while ( my ($k => $v) = splice( @kv_pairs, 0, 2 ) ) {
+        next if !defined $v;
         $self->_consume_peer_header($k => $v);
     }
 
-    $self->_valid_headers_or_die();
+    $self->_die_if_missing_headers();
 
     return;
 }
@@ -295,6 +299,10 @@ sub _consume_generic_header {
                 $self->{'_connection_header_ok'} = 1;
             }
         }
+
+        if (!$self->{'_connection_header_ok'}) {
+            die Net::WebSocket::X->create('BadHeader', 'Connection' => $value, 'Must contain “upgrade”');
+        }
     }
     elsif ($hname eq 'upgrade') {
         $value =~ tr<A-Z><a-z>;
@@ -302,6 +310,10 @@ sub _consume_generic_header {
             if ($t eq 'websocket') {
                 $self->{'_upgrade_header_ok'} = 1;
             }
+        }
+
+        if (!$self->{'_upgrade_header_ok'}) {
+            die Net::WebSocket::X->create('BadHeader', 'Upgrade' => $value, 'Must contain “websocket”');
         }
     }
     elsif ($hname eq 'sec-websocket-protocol') {

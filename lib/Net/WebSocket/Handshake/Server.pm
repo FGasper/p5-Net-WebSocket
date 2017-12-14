@@ -104,6 +104,10 @@ sub _consume_peer_header {
         $self->{'_version_ok'} = 1;
     }
     elsif ($name eq 'sec-websocket-key') {
+        if ($value !~ m<\A[A-Za-z0-9/\+]{22}==\z>) {
+            die Net::WebSocket::X->create('BadHeader', 'Sec-WebSocket-Key' => $value);
+        }
+
         $self->{'key'} = $value;
     }
     elsif ($name eq 'sec-websocket-protocol') {
@@ -137,7 +141,7 @@ sub _encode_subprotocols {
     return $self->SUPER::_encode_subprotocols();
 }
 
-sub _valid_headers_or_die {
+sub _die_if_missing_headers {
     my ($self) = @_;
 
     my @needed = $self->_missing_generic_headers();
@@ -145,7 +149,9 @@ sub _valid_headers_or_die {
     push @needed, 'Sec-WebSocket-Version' if !$self->{'_version_ok'};
     push @needed, 'Sec-WebSocket-Key' if !$self->{'key'};
 
-    die "Need: [@needed]" if @needed;
+    if (@needed) {
+        die Net::WebSocket::X->create('MissingHeaders', @needed);
+    }
 
     return;
 }

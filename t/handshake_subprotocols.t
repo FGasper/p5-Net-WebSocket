@@ -22,7 +22,6 @@ my $client = Net::WebSocket::Handshake::Client->new(
 my $req_str = $client->to_string();
 
 my $req = HTTP::Request->parse($req_str);
-diag explain $req_str;
 
 my $server = Net::WebSocket::Handshake::Server->new(
     subprotocols => [ 'ghi', 'def', 'jkl' ],

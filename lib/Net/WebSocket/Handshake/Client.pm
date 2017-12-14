@@ -193,7 +193,7 @@ sub _create_header_lines {
     );
 }
 
-sub _valid_headers_or_die {
+sub _die_if_missing_headers {
     my ($self) = @_;
 
     my @needed = $self->_missing_generic_headers();
