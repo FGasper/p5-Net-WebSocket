@@ -209,12 +209,17 @@ sub get_rsv {
     return( ord( substr( ${ $self->[FIRST2] }, 0, 1 ) & "\x70" ) >> 4 );
 }
 
+my $rsv;
 sub set_rsv {
-    my ($self, $rsv) = @_;
+    $rsv = $_[1];
 
-    ${ $self->[FIRST2] } |= chr( $rsv << 4 );
+    #Consider the first byte as a vector of 4-bit segments.
 
-    return $self;
+    $rsv |= 8 if substr( ${ $_[0]->[FIRST2] }, 0, 1 ) & "\x80";
+
+    vec( substr( ${ $_[0]->[FIRST2] }, 0, 1 ), 1, 4 ) = $rsv;
+
+    return $_[0];
 }
 
 sub set_rsv1 {
@@ -236,15 +241,15 @@ sub set_rsv3 {
 }
 
 sub has_rsv1 {
-    return ("\0\0" ne (${ $_[0][FIRST2] } & _RSV1()));
+    return ("\0" ne (${ $_[0][FIRST2] } & _RSV1()));
 }
 
 sub has_rsv2 {
-    return ("\0\0" ne (${ $_[0][FIRST2] } & _RSV2()));
+    return ("\0" ne (${ $_[0][FIRST2] } & _RSV2()));
 }
 
 sub has_rsv3 {
-    return ("\0\0" ne (${ $_[0][FIRST2] } & _RSV3()));
+    return ("\0" ne (${ $_[0][FIRST2] } & _RSV3()));
 }
 
 #----------------------------------------------------------------------
@@ -264,46 +269,6 @@ sub get_fin {
 
     return( ord ("\x80" & ${$self->[$self->FIRST2]}) && 1 );
 }
-
-#----------------------------------------------------------------------
-
-#sub get_opcode {
-#    my ($class) = @_;
-#
-#    die "$class (type “$type”) must define a custom get_opcode() method!";
-#}
-
-#----------------------------------------------------------------------
-
-#Unneeded?
-#sub set_mask_bytes {
-#    my ($self, $bytes) = @_;
-#
-#    if (!defined $bytes) {
-#        die "Set either a 4-byte mask, or empty string!";
-#    }
-#
-#    if (length $bytes) {
-#        _validate_mask($bytes);
-#
-#        $self->_activate_highest_bit( $self->[FIRST2], 1 );
-#    }
-#    else {
-#        $self->_deactivate_highest_bit( $self->[FIRST2], 1 );
-#    }
-#
-#    if (${ $self->[MASK] }) {
-#        Net::WebSocket::Mask::apply( $self->[PAYLOAD], ${ $self->[MASK] } );
-#    }
-#
-#    $self->[MASK] = \$bytes;
-#
-#    if ($bytes) {
-#        Net::WebSocket::Mask::apply( $self->[PAYLOAD], $bytes );
-#    }
-#
-#    return $self;
-#}
 
 #----------------------------------------------------------------------
 
