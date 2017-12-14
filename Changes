@@ -120,3 +120,6 @@ the entire handshake.
 
 0.063 Wed Dec 13 2017
 - Fix frame ->to_bytes() logic for large frames on 32-bit perls.
+
+0.064
+- Fix frame RSV methods, add tests
