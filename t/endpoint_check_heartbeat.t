@@ -15,14 +15,14 @@ use IO::Framed ();
 use Net::WebSocket::Parser           ();
 use Net::WebSocket::Endpoint::Server ();
 
-plan tests => 4;
+plan tests => 9;
 
 #----------------------------------------------------------------------
 
 
 open my $infh, '<', \do { my $v = q<> };
 
-my $outfile = File::Temp::tempfile( CLEANUP => 1 );
+(undef, my $outfile) = File::Temp::tempfile( CLEANUP => 1 );
 open my $outfh, '>', $outfile;
 
 my $parser = Net::WebSocket::Parser->new( IO::Framed->new($infh) );
@@ -43,7 +43,7 @@ cmp_deeply(
     all(
         Isa('Net::WebSocket::Frame::ping'),
         methods(
-            get_payload => re( qr<1> ),
+            get_payload => re( qr<0> ),
         ),
     ),
     'check_heartbeat() sends 1st ping frame as expected',
@@ -59,7 +59,7 @@ cmp_deeply(
     all(
         Isa('Net::WebSocket::Frame::ping'),
         methods(
-            get_payload => re( qr<2> ),
+            get_payload => re( qr<1> ),
         ),
     ),
     'check_heartbeat() sends 2nd ping frame as expected',
@@ -75,11 +75,18 @@ cmp_deeply(
     all(
         Isa('Net::WebSocket::Frame::ping'),
         methods(
-            get_payload => re( qr<3> ),
+            get_payload => re( qr<2> ),
         ),
     ),
     'check_heartbeat() sends 3rd ping frame as expected',
 );
+
+for my $method ( qw( is_closed received_close_frame sent_close_frame ) ) {
+    ok(
+        !$ept->$method(),
+        "!$method() before last check_heartbeat()",
+    );
+}
 
 $ept->check_heartbeat();
 
@@ -97,3 +104,11 @@ cmp_deeply(
     ),
     'check_heartbeat() sends close() instead of 4th ping',
 );
+
+for my $method ( qw( is_closed sent_close_frame ) ) {
+    ok(
+        $ept->$method(),
+        "$method() after last check_heartbeat()",
+    );
+}
+#----------------------------------------------------------------------

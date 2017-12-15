@@ -80,6 +80,7 @@ t/constants.t
 t/create_frame.t
 t/endpoint_allow_empty_read.t
 t/endpoint_check_heartbeat.t
+t/endpoint_pong_reset.t
 t/frame_methods.t
 t/handshake.t
 t/handshake_case_insensitivity.t
