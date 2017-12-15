@@ -10,7 +10,7 @@ use parent qw(
 use Net::WebSocket::X ();
 
 use constant get_fin => 1;
-use constant is_control_frame => 1;
+use constant is_control => 1;
 
 sub _assemble_length {
     my ($class, $payload_sr) = @_;

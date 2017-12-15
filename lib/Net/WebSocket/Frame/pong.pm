@@ -18,7 +18,7 @@ Net::WebSocket::Frame::pong
 
     $frm->get_type();           #"ping"
 
-    $frm->is_control_frame();   #1
+    $frm->is_control();   #1
 
     my $mask = $frm->get_mask_bytes();
 

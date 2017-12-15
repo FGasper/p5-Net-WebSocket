@@ -31,6 +31,9 @@ sub message_is_compressed {
     return ($_[1]->get_frames())[0]->has_rsv1();
 }
 
+#There is no frame_is_compressed() because compression
+#is only supposed to apply to messages.
+
 =head2 INITIAL_FRAME_RSV()
 
 Returns the numeric value of the RSV bits for PMCEs,

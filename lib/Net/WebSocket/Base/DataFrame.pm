@@ -8,7 +8,7 @@ use parent qw(
 );
 
 use constant {
-    is_control_frame => 0,
+    is_control => 0,
     _MAX_32_BIT_LENGTH => 0xffffffff,
 };
 

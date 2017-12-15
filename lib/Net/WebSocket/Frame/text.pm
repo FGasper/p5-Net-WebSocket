@@ -21,7 +21,7 @@ Net::WebSocket::Frame::text
 
     $frm->get_type();           #"text"
 
-    $frm->is_control_frame();   #0
+    $frm->is_control();   #0
 
     my $mask = $frm->get_mask_bytes();
 

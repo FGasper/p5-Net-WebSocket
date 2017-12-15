@@ -20,7 +20,7 @@ Net::WebSocket::Frame::close
 
     $frm->get_type();           #"close"
 
-    $frm->is_control_frame();   #1
+    $frm->is_control();   #1
 
     my $mask = $frm->get_mask_bytes();
 

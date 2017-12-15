@@ -124,7 +124,7 @@ my @tests = (
                         get_type => 'pong',
                         get_payload => q<>,
                         get_fin => 1,
-                        is_control_frame => 1,
+                        is_control => 1,
                         get_mask_bytes => q<>,
                     ),
                 ),

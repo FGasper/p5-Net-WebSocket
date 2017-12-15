@@ -252,12 +252,8 @@ sub has_rsv3 {
     return ("\0" ne (${ $_[0][FIRST2] } & _RSV3()));
 }
 
-#----------------------------------------------------------------------
-
-sub opcode_to_type {
-    my ($class, $opcode) = @_;
-    return Net::WebSocket::Constants::opcode_to_type($opcode);
-}
+#pre-0.064 compatibility
+sub is_control_frame { return $_[0]->is_control() }
 
 #----------------------------------------------------------------------
 

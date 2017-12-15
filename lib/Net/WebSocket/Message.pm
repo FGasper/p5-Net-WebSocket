@@ -31,8 +31,8 @@ sub get_type {
     return $_[0][0]->get_type();
 }
 
-sub is_control_message {
-    return $_[0][0]->is_control_frame();
+sub is_control {
+    return $_[0][0]->is_control();
 }
 
 sub to_bytes {

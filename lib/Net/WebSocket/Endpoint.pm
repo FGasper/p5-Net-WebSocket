@@ -63,7 +63,7 @@ sub get_next_message {
     my $_msg_frame;
 
     if ( $_msg_frame = $self->{'_parser'}->get_next_frame() ) {
-        if ($_msg_frame->is_control_frame()) {
+        if ($_msg_frame->is_control()) {
             $self->_handle_control_frame($_msg_frame);
         }
         else {
@@ -130,7 +130,7 @@ sub close {
 
     my $close = Net::WebSocket::Frame::close->new(
         $self->FRAME_MASK_ARGS(),
-        code => $opts{'code'} || 'ENDPOINT_UNAVAILABLE',
+        code => $opts{'code'},
         reason => $opts{'reason'},
     );
 
