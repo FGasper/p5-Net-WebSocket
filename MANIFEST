@@ -82,6 +82,7 @@ t/create_frame.t
 t/endpoint_allow_empty_read.t
 t/endpoint_bad_continuation.t
 t/endpoint_check_heartbeat.t
+t/endpoint_close.t
 t/endpoint_missing_continuation.t
 t/endpoint_pong_reset.t
 t/frame_methods.t

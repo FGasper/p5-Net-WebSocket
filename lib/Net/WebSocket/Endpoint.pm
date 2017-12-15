@@ -258,7 +258,15 @@ sub _handle_control_frame {
 
     if ($type eq 'close') {
         if (!$self->{'_sent_close_frame'}) {
-            $self->_close_with_frame($frame);
+            my ($code, $reason) = $frame->get_code_and_reason();
+
+            $self->_close_with_frame(
+                Net::WebSocket::Frame::close->new(
+                    code => $code,
+                    reason => $reason,
+                    $self->FRAME_MASK_ARGS(),
+                ),
+            );
         }
 
         if ($self->{'_received_close_frame'}) {
