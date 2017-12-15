@@ -253,68 +253,13 @@ sub has_rsv3 {
 }
 
 #----------------------------------------------------------------------
-#Redundancies with methods in DataFrame.pm and ControlFrame.pm.
-#These are here so that we don’t have to re-bless in order to get this
-#information.
-
-sub is_control_frame {
-    my ($self) = @_;
-
-    #8 == 0b1000 == 010
-    return( ($self->_extract_opcode() & 8) ? 1 : 0 );
-}
-
-sub get_fin {
-    my ($self) = @_;
-
-    return( ord ("\x80" & ${$self->[$self->FIRST2]}) && 1 );
-}
-
-#----------------------------------------------------------------------
 
 sub opcode_to_type {
     my ($class, $opcode) = @_;
     return Net::WebSocket::Constants::opcode_to_type($opcode);
 }
 
-our $AUTOLOAD;
-sub AUTOLOAD {
-    my ($self) = shift;
-
-    return if substr( $AUTOLOAD, -8 ) eq ':DESTROY';
-
-    my $last_colon_idx = rindex( $AUTOLOAD, ':' );
-    my $method = substr( $AUTOLOAD, 1 + $last_colon_idx );
-
-    #Figure out what type this is, and re-bless.
-    if (ref($self) eq __PACKAGE__) {
-        my $opcode = $self->_extract_opcode();
-        my $type = $self->opcode_to_type($opcode);
-
-        my $class = __PACKAGE__ . "::$type";
-        if (!$class->can('new')) {
-            Module::Load::load($class);
-        }
-
-        bless $self, $class;
-
-        if ($self->can($method)) {
-            return $self->$method(@_);
-        }
-    }
-
-    my $class = (ref $self) || $self;
-
-    die( "$class has no method “$method”!" );
-}
-
 #----------------------------------------------------------------------
-
-sub _extract_opcode {
-    my ($self) = @_;
-
-    return 0xf & ord substr( ${ $self->[FIRST2] }, 0, 1 );
-}
 
 sub _validate_mask {
     my ($bytes) = @_;

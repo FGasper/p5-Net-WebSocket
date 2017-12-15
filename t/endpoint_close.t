@@ -54,10 +54,7 @@ cmp_deeply(
         Isa('Net::WebSocket::Frame::close'),
         listmethods(
             get_mask_bytes => [ q<> ],
-            get_code_and_reason => [
-                4567,
-                'dunno',
-            ],
+            get_code_and_reason => [ 4567, 'dunno' ],
         ),
     ),
     'close() prompts a response',
