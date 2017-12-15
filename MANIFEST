@@ -70,6 +70,7 @@ lib/Net/WebSocket/X/DuplicateHeader.pm
 lib/Net/WebSocket/X/EndpointAlreadyClosed.pm
 lib/Net/WebSocket/X/MissingHeaders.pm
 lib/Net/WebSocket/X/ReceivedBadControlFrame.pm
+lib/Net/WebSocket/X/ReceivedBadDataFrame.pm
 lib/Net/WebSocket/X/ReceivedClose.pm
 lib/Net/WebSocket/X/UnfinishedStream.pm
 lib/Net/WebSocket/X/UnknownExtension.pm
@@ -79,7 +80,9 @@ t/Net-WebSocket-HTTP.t
 t/constants.t
 t/create_frame.t
 t/endpoint_allow_empty_read.t
+t/endpoint_bad_continuation.t
 t/endpoint_check_heartbeat.t
+t/endpoint_missing_continuation.t
 t/endpoint_pong_reset.t
 t/frame_methods.t
 t/handshake.t

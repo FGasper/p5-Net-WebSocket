@@ -12,6 +12,7 @@ use File::Temp ();
 
 use IO::Framed ();
 
+use Net::WebSocket::Frame::pong      ();
 use Net::WebSocket::Parser           ();
 use Net::WebSocket::Endpoint::Server ();
 

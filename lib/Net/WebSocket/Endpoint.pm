@@ -240,7 +240,7 @@ sub _got_non_continuation_during_fragment {
 
     $self->_write_frame($err_frame);
 
-    die Net::WebSocket::X->create( 'ReceivedBadControlFrame', $msg );
+    die Net::WebSocket::X->create( 'ReceivedBadDataFrame', $msg );
 }
 
 sub _verify_not_closed {
