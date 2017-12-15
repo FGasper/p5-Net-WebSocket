@@ -123,3 +123,4 @@ the entire handshake.
 
 0.064
 - Fix frame RSV methods, add tests
+- Use exception objects for remaining server handshake problems.
