@@ -130,7 +130,7 @@ sub close {
 
     my $close = Net::WebSocket::Frame::close->new(
         $self->FRAME_MASK_ARGS(),
-        code => $opts{'code'},
+        code => $opts{'code'} || 'ENDPOINT_UNAVAILABLE',
         reason => $opts{'reason'},
     );
 

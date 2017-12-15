@@ -121,6 +121,11 @@ the entire handshake.
 0.063 Wed Dec 13 2017
 - Fix frame ->to_bytes() logic for large frames on 32-bit perls.
 
-0.064
+0.1 Fri Dec 15 2017
 - Fix frame RSV methods, add tests
 - Use exception objects for remaining server handshake problems.
+- is_control_frame() method is renamed to is_control().
+  (The old name is also preserved for legacy compatibility.)
+- All messages are now Net::WebSocket::Message instances; the ::text and
+  ::binary subclasses are removed. They weren’t useful, and they complicated
+  support for custom frame/message types.
