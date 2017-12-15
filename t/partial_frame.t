@@ -36,7 +36,7 @@ my @tests = (
     {
         label => 'from server, long length',
         bytes => "\x81\x7f" . "\x00\x00\x00\x00\x00\x01\x00\x00" . ('x' x 2**16),
-        payload => ('x' x 65536),
+        payload => ('x' x 2**16),
     },
 );
 

@@ -47,7 +47,7 @@ sub _generate_text {
     return sprintf(
         '%s UTC: ping #%d (%x)',
         scalar(gmtime),
-        $self->get_count(),
+        1 + $self->get_count(),
         substr(rand, 2),
     );
 }
