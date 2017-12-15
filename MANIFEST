@@ -14,7 +14,6 @@ demo/wscat_the_hard_way.pl
 lib/Net/WebSocket.pm
 lib/Net/WebSocket/Base/ControlFrame.pm
 lib/Net/WebSocket/Base/DataFrame.pm
-lib/Net/WebSocket/Base/DataMessage.pm
 lib/Net/WebSocket/Base/ReadString.pm
 lib/Net/WebSocket/Base/Typed.pm
 lib/Net/WebSocket/Constants.pm
@@ -39,8 +38,6 @@ lib/Net/WebSocket/Mask.pm
 lib/Net/WebSocket/Masker/Client.pm
 lib/Net/WebSocket/Masker/Server.pm
 lib/Net/WebSocket/Message.pm
-lib/Net/WebSocket/Message/binary.pm
-lib/Net/WebSocket/Message/text.pm
 lib/Net/WebSocket/PMCE.pm
 lib/Net/WebSocket/PMCE/Data.pm
 lib/Net/WebSocket/PMCE/deflate.pm
@@ -91,6 +88,7 @@ t/handshake_case_insensitivity.t
 t/handshake_extension.t
 t/handshake_server_failures.t
 t/handshake_subprotocols.t
+t/message_methods.t
 t/parse_message.t
 t/parse_message_close.t
 t/parser_roundtrip.t

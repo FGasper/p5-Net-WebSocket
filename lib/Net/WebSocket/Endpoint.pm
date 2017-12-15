@@ -85,7 +85,7 @@ sub get_next_message {
             }
 
             if ($_msg_frame->get_fin()) {
-                return Net::WebSocket::Message::create_from_frames(
+                return Net::WebSocket::Message->new(
                     splice( @{ $self->{'_fragments'} } ),
                     $_msg_frame,
                 );

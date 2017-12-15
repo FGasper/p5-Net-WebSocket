@@ -27,24 +27,18 @@ sub get_payload {
     return join( q<>, map { $_->get_payload() } @$self );
 }
 
+sub get_type {
+    return $_[0][0]->get_type();
+}
+
+sub is_control_message {
+    return $_[0][0]->is_control_frame();
+}
+
 sub to_bytes {
     my ($self) = @_;
 
     return join( q<>, map { $_->to_bytes() } @$self );
-}
-
-#----------------------------------------------------------------------
-# Static function that auto-loads the actual message class.
-
-sub create_from_frames {
-    my $type = $_[0]->get_type();
-
-    my $class = __PACKAGE__ . "::$type";
-    if (!$class->can('new')) {
-        Module::Load::load($class);
-    }
-
-    return $class->new(@_);
 }
 
 1;

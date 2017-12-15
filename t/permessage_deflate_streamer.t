@@ -18,7 +18,7 @@ my @frames = (
 
 #----------------------------------------------------------------------
 
-my $msg = Net::WebSocket::Message::create_from_frames(@frames);
+my $msg = Net::WebSocket::Message->new(@frames);
 
 my $round_trip = $deflate->decompress( $msg->get_payload() );
 
@@ -33,7 +33,7 @@ my @frames2 = (
     $streamer2->create_final('Hello'),
 );
 
-my $msg2 = Net::WebSocket::Message::create_from_frames(@frames2);
+my $msg2 = Net::WebSocket::Message->new(@frames2);
 
 isnt(
     substr( $msg->get_payload(), 0, length $msg2->get_payload() ),

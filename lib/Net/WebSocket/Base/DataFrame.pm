@@ -61,4 +61,10 @@ sub set_fin {
     return $self;
 }
 
+sub get_fin {
+    my ($self) = @_;
+
+    return( ord ("\x80" & ${$self->[$self->FIRST2]}) && 1 );
+}
+
 1;

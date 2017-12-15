@@ -60,9 +60,7 @@ sub new {
 =head2 $msg = I<OBJ>->create_message( FRAME_TYPE, PAYLOAD )
 
 Creates an unfragmented, compressed message. The message will be an
-instance of the class that C<Net::WebSocket::Message::create_from_frames()>
-would instantiate; e.g., if FRAME_CLASS is C<Net::WebSocket::Frame::text>,
-the message will be of type C<Net::WebSocket::Message::text>.
+instance of L<Net::WebSocket::Message>.
 
 This method cannot be called while a streamer object has yet to create its
 final frame.
@@ -82,7 +80,7 @@ sub create_message {
 
     my $frame_class = Net::WebSocket::FrameTypeName::get_module($frame_type);
 
-    return Net::WebSocket::Message::create_from_frames(
+    return Net::WebSocket::Message->new(
         $frame_class->new(
             payload => $payload_sr,
             rsv => $self->INITIAL_FRAME_RSV(),

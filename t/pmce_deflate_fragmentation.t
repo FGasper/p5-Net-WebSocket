@@ -31,7 +31,7 @@ while (@frames < 2) {
     }
 }
 
-my $msg = Net::WebSocket::Message::create_from_frames(@frames);
+my $msg = Net::WebSocket::Message->new(@frames);
 
 #printf "uncompressed: %d\ncompressed: %d\n", length( join(q<>, @pieces) ), length $msg->get_payload();
 
