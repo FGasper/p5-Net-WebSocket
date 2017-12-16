@@ -10,6 +10,7 @@ BEGIN {
 use Test::More;
 
 use File::Temp ();
+use Sys::MemInfo ();
 
 use IO::Framed::Read ();
 
@@ -49,6 +50,10 @@ my @frames_to_test = (
 #----------------------------------------------------------------------
 
 plan tests => 0 + @frames_to_test;
+
+for my $memkey ( Sys::MemInfo::availkeys() ) {
+    diag( sprintf("%s: %s", $memkey, Sys::MemInfo::get($memkey)) );
+}
 
 for my $frame_t (@frames_to_test) {
     my $class = "Net::WebSocket::Frame::$frame_t->{'type'}";
