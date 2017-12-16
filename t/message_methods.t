@@ -29,7 +29,7 @@ my $msg = Net::WebSocket::Message->new(@frames);
 is( $msg->get_payload(), '123456789', 'get_payload()' );
 
 is( $msg->get_type, $frames[0]->get_type(), 'get_type()' );
-ok( !$msg->is_control_message, 'is_control_message()' );
+ok( !$msg->is_control(), 'is_control()' );
 
 
 is(
