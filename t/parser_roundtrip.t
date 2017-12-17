@@ -10,7 +10,6 @@ BEGIN {
 use Test::More;
 
 use File::Temp ();
-use Sys::MemInfo ();
 
 use IO::Framed::Read ();
 

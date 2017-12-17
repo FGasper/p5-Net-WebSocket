@@ -1,5 +1,8 @@
 Revision history for Perl module Net::WebSocket
 
+0.11 Sun Dec 17 2017
+- Fix an OOM error on CPAN Testers. (No production code changes.)
+
 0.1 Fri Dec 15 2017
 - MINOR BREAKING: All messages are now Net::WebSocket::Message instances;
   the ::text and ::binary subclasses are removed. They weren’t useful, and
