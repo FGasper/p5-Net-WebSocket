@@ -1,8 +1,9 @@
 #!/usr/bin/env perl
 
 use Test::More;
+use Test::NoWarnings;
 
-plan tests => 2;
+plan tests => 1 + 2;
 
 use Net::WebSocket::Message ();
 use Net::WebSocket::PMCE::deflate::Data::Server ();

@@ -4,9 +4,10 @@ use strict;
 use warnings;
 
 use Test::More;
+use Test::NoWarnings;
 use Test::Deep;
 
-plan tests => 3;
+plan tests => 1 + 3;
 
 use File::Temp;
 

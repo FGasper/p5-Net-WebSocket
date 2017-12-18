@@ -1,6 +1,11 @@
+#!/usr/bin/env perl
+
 use Test::More;
 
-plan tests => 3;
+#We expect at least one warning in this test.
+#use Test::NoWarnings;
+
+plan tests => 0 + 3;
 
 use HTTP::Request ();
 

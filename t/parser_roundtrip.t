@@ -8,6 +8,7 @@ BEGIN {
 }
 
 use Test::More;
+use Test::NoWarnings;
 
 use File::Temp ();
 
@@ -26,29 +27,12 @@ my @frames_to_test = (
         type => 'text',
         payload => ('x' x 128),
     },
-);
-
-#CPAN Testers keeps getting OOM errors when it parses this frame.
-#e.g.:
-#
-#   http://www.cpantesters.org/cpan/report/33205f0a-e2b3-11e7-b440-b0a88896c47c
-#   http://www.cpantesters.org/cpan/report/67dd0a5a-e2d0-11e7-a1cf-bb670eaac09d
-#
-#I’ve not been able to find any memory leaks, and this test runs fine on
-#machines that appear to be much lower-powered than the smokers. There may be
-#some artificial memory limit being imposed? Anyway, for now let’s forgo this
-#one on the CPAN Testers smokers:
-my $is_cpan_testers = $ENV{'AUTOMATED_TESTING'};
-$is_cpan_testers &&= $ENV{'NONINTERACTIVE_TESTING'};
-$is_cpan_testers &&= $ENV{'PERL_CR_SMOKER_CURRENT'};
-
-if ( 1 || !$is_cpan_testers ) {
-    push @frames_to_test, {
+    {
         label => 'binary, 70000 - large frame (32-bit compatible)',
         type => 'binary',
         payload => ('x' x 70000),
-    };
-}
+    },
+);
 
 #----------------------------------------------------------------------
 #Let’s forgo 64-bit tests for now since they’d require a testing
@@ -65,7 +49,7 @@ if ( 1 || !$is_cpan_testers ) {
 #}
 #----------------------------------------------------------------------
 
-plan tests => 0 + @frames_to_test;
+plan tests => 1 + @frames_to_test;
 
 for my $frame_t (@frames_to_test) {
     my $class = "Net::WebSocket::Frame::$frame_t->{'type'}";

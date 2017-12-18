@@ -8,6 +8,7 @@ BEGIN {
 }
 
 use Test::More;
+use Test::NoWarnings;
 use Test::Deep;
 
 use IO::Handle;     #for pre-5.14
@@ -40,7 +41,7 @@ my @tests = (
     },
 );
 
-plan tests => 0 + @tests;
+plan tests => 1 + @tests;
 
 for my $t (@tests) {
     my $bytes = $t->{'bytes'};

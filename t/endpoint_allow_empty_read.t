@@ -8,7 +8,9 @@ BEGIN {
 }
 
 use Test::More;
-plan tests => 5;
+use Test::NoWarnings;
+
+plan tests => 1 + 5;
 
 use File::Temp ();
 use File::Slurp ();

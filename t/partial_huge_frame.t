@@ -8,13 +8,14 @@ BEGIN {
 }
 
 use Test::More;
+use Test::NoWarnings;
 use Test::Deep;
 
 use IO::Select ();
 
 use Net::WebSocket::Parser ();
 
-plan tests => 1;
+plan tests => 1 + 1;
 
 ok 1, 'We all know this protocol does fragmentation, right?';
 

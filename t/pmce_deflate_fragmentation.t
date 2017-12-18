@@ -1,3 +1,5 @@
+#!/usr/bin/env perl
+
 use strict;
 use warnings;
 
@@ -6,7 +8,7 @@ use Test::NoWarnings;
 
 use Time::HiRes ();
 
-plan tests => 2;
+plan tests => 1 + 1;
 
 use Net::WebSocket::PMCE::deflate::Data::Server ();
 

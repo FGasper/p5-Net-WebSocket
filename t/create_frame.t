@@ -4,6 +4,7 @@ use strict;
 use warnings;
 
 use Test::More;
+use Test::NoWarnings;
 
 use Module::Load ();
 
@@ -34,7 +35,7 @@ my @tests = (
     ],
 );
 
-plan tests => 0 + @tests;
+plan tests => 1 + @tests;
 
 for my $t (@tests) {
     my ($type, @args) = @{ $t->[1] };

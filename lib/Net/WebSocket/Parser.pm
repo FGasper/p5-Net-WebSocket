@@ -107,51 +107,39 @@ sub new {
 
     return bless {
         _reader => $reader,
+        _partial_frame => q<>,
     }, $class;
 }
+
+#Create these out here so that we don’t create/destroy them on each frame.
+#As long as we don’t access them prior to writing to them this is fine.
+my ($first2, $oct1, $oct2, $len, $mask_size, $mask_buf, $len_len, $len_buf, $longs, $long);
 
 sub get_next_frame {
     my ($self) = @_;
 
     local $@;
 
-    if (!exists $self->{'_partial_frame'}) {
-        $self->{'_partial_frame'} = q<>;
-    }
-
     #It is really, really inconvenient that Perl has no “or” operator
     #that considers q<> falsey but '0' truthy. :-/
     #That aside, if indeed all we read is '0', then we know that’s not
     #enough, and we can return.
-    my $first2 = $self->_read_with_buffer(2);
+    $first2 = $self->_read_with_buffer(2);
     if (!$first2) {
         return defined($first2) ? q<> : undef;
     }
 
-    #Now that we’ve read our header bytes, we’ll read some more.
-    #There may not actually be anything to read, though, in which case
-    #some readers will error (e.g., EAGAIN from a non-blocking filehandle).
-    #From a certain ideal we’d return #on each individual read to allow
-    #the reader to wait until there is more data ready; however, for
-    #practicality (and speed) let’s go ahead and try to read the rest of
-    #the frame. That means we need to set some flag to let the reader know
-    #not to die() if there’s no more data currently, as we’re probably
-    #expecting more soon to complete the frame.
-    local $self->{'_reading_frame'} = 1;
+    ($oct1, $oct2) = unpack('CC', $first2 );
 
-    my ($oct1, $oct2) = unpack('CC', $first2 );
+    $len = $oct2 & 0x7f;
 
-    my $len = $oct2 & 0x7f;
+    $mask_size = ($oct2 & 0x80) && 4;
 
-    my $mask_size = ($oct2 & 0x80) && 4;
-
-    my $len_len = ($len == 0x7e) ? 2 : ($len == 0x7f) ? 8 : 0;
-    my $len_buf = q<>;
-
-    my ($longs, $long);
+    $len_len = ($len == 0x7e) ? 2 : ($len == 0x7f) ? 8 : 0;
 
     if ($len_len) {
         $len_buf = $self->_read_with_buffer($len_len);
+
         if (!$len_buf) {
             substr( $self->{'_partial_frame'}, 0, 0, $first2 );
             return defined($len_buf) ? q<> : undef;
@@ -161,14 +149,16 @@ sub get_next_frame {
             ($longs, $long) = ( 0, unpack('n', $len_buf) );
         }
         else {
+
+            #Do it this way to support 32-bit systems.
             ($longs, $long) = ( unpack('NN', $len_buf) );
         }
     }
     else {
         ($longs, $long) = ( 0, $len );
+        $len_buf = q<>;
     }
 
-    my $mask_buf;
     if ($mask_size) {
         $mask_buf = $self->_read_with_buffer($mask_size);
         if (!$mask_buf) {
@@ -229,6 +219,9 @@ sub get_next_frame {
 
 #This will only return exactly the number of bytes requested.
 #If fewer than we want are available, then we return undef.
+#
+#NB: This predates IO::Framed and might be due for a simplification.
+#
 sub _read_with_buffer {
     my ($self, $length) = @_;
 
