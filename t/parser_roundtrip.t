@@ -68,34 +68,23 @@ if ( 1 || !$is_cpan_testers ) {
 plan tests => 0 + @frames_to_test;
 
 for my $frame_t (@frames_to_test) {
-diag 'one';
     my $class = "Net::WebSocket::Frame::$frame_t->{'type'}";
-diag 'two';
     Module::Load::load($class);
-diag 'three';
     my $frame = $class->new(
         payload => $frame_t->{'payload'},
     );
-diag 'four';
 
     my ($fh, $fpath) = File::Temp::tempfile( CLEANUP => 1 );
-diag 'five';
 
     print {$fh} $frame->to_bytes();
-diag 'six';
     close $fh;
-diag 'seven';
 
     open my $rfh, '<', $fpath;
-diag 'eight';
 
     my $iof = IO::Framed::Read->new($rfh);
-diag 'nine';
     my $parser = Net::WebSocket::Parser->new($iof);
-diag 'ten';
 
     my $frame2 = $parser->get_next_frame();
-diag 'eleven';
 
     is(
         $frame2->to_bytes(),

@@ -82,6 +82,7 @@ t/endpoint_check_heartbeat.t
 t/endpoint_close.t
 t/endpoint_missing_continuation.t
 t/endpoint_pong_reset.t
+t/frame_length_encoding.t
 t/frame_methods.t
 t/handshake.t
 t/handshake_case_insensitivity.t

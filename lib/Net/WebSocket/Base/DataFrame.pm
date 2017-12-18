@@ -12,9 +12,10 @@ use constant {
     _MAX_32_BIT_LENGTH => 0xffffffff,
 };
 
-my $can_pack_Q;
+#accessed from tests
+our $_can_pack_Q;
 BEGIN {
-    $can_pack_Q = eval { pack 'Q', 0 };
+    $_can_pack_Q = eval { pack 'Q', 0 };
 }
 
 my $length;
@@ -39,11 +40,11 @@ sub _assemble_length {
 
         #Even without 64-bit support, we can still support
         #anything up to a 32-bit length
-        if ($can_pack_Q) {
+        if ($_can_pack_Q) {
             $len_len = pack 'Q>', $length;
         }
         elsif ($length <= _MAX_32_BIT_LENGTH) {
-            $len_len = (pack 'N', $length) . "\0\0\0\0";
+            $len_len = "\0\0\0\0" . (pack 'N', $length);
         }
         else {
             die sprintf( "This Perl version (%s) doesn’t support 64-bit integers, which means WebSocket frames must be no larger than %d bytes. You tried to create a %d-byte frame.", $^V, _MAX_32_BIT_LENGTH, $length);
