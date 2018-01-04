@@ -33,6 +33,9 @@ Net::WebSocket::Frame::binary
 
 =cut
 
+use strict;
+use warnings;
+
 use parent qw(
     Net::WebSocket::Base::DataFrame
 );

@@ -62,6 +62,10 @@ sub new {
 Creates an unfragmented, compressed message. The message will be an
 instance of L<Net::WebSocket::Message>.
 
+FRAME_TYPE can be either C<text> or C<binary> (for Net::WebSocket’s
+default frame classes) or full package names (e.g., to use a custom
+frame class).
+
 This method cannot be called while a streamer object has yet to create its
 final frame.
 

@@ -101,6 +101,23 @@ sub get_next_message {
     return defined($_msg_frame) ? q<> : undef;
 }
 
+sub create_message {
+    my ($self, $frame_type, $payload) = @_;
+
+    require Net::WebSocket::FrameTypeName;
+    require Net::WebSocket::Message;
+
+    my $frame_class = Net::WebSocket::FrameTypeName::get_module($frame_type);
+    Module::Load::load($frame_class);
+
+    return Net::WebSocket::Message->new(
+        $frame_class->new(
+            payload => $payload,
+            $self->FRAME_MASK_ARGS(),
+        ),
+    );
+}
+
 sub check_heartbeat {
     my ($self) = @_;
 

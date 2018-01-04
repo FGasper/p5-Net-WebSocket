@@ -1,5 +1,8 @@
 Revision history for Perl module Net::WebSocket
 
+0.12 Wed Jan 3 2018
+- Added create_message() convenience method in Endpoint.pm
+
 0.11 Sun Dec 17 2017
 - (Really) fix “large” frame size encoding on 32-bit perls, add test.
 - Check for warnings in tests.

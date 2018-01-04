@@ -1,5 +1,13 @@
 package Net::WebSocket::Endpoint::Server;
 
+use strict;
+use warnings;
+
+use parent qw(
+    Net::WebSocket::Endpoint
+    Net::WebSocket::Masker::Server
+);
+
 =encoding utf-8
 
 =head1 NAME
@@ -23,6 +31,8 @@ Net::WebSocket::Endpoint::Server
             #...
         },
     );
+
+    my $msg_to_send = $ept->create_message('text', 'Hello!');
 
     if ( _we_timed_out_waiting_for_read_readiness() ) {
         $ept->check_heartbeat();
@@ -111,6 +121,22 @@ See below for more information.
 This method may not be called after a close frame has been sent (i.e.,
 if the C<is_closed()> method returns true).
 
+=head2 I<OBJ>->create_message( FRAME_TYPE, PAYLOAD )
+
+Creates an unfragmented message with the given PAYLOAD.
+
+FRAME_TYPE can be either C<text> or C<binary> (for Net::WebSocket’s
+default frame classes) or full package names (e.g., to use a custom
+frame class).
+
+This is a convenience method that takes care of mask creation and module
+loading for you.
+
+See L<Net::WebSocket::PMCE::deflate::Data> for similar functionality
+to create a compressed message.
+
+=cut
+
 =head2 I<OBJ>->check_heartbeat()
 
 Ordinarily, sends a distinct ping frame to the remote server
@@ -182,13 +208,5 @@ see the documentation for L<Net::WebSocket::Parser>.
 =back
 
 =cut
-
-use strict;
-use warnings;
-
-use parent qw(
-    Net::WebSocket::Endpoint
-    Net::WebSocket::Masker::Server
-);
 
 1;
