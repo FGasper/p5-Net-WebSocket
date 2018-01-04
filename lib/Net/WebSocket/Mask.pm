@@ -3,8 +3,6 @@ package Net::WebSocket::Mask;
 use strict;
 use warnings;
 
-use Module::Load ();
-
 my $_loaded_rng;
 
 sub create {

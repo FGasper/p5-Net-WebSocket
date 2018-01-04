@@ -108,7 +108,7 @@ sub create_message {
     require Net::WebSocket::Message;
 
     my $frame_class = Net::WebSocket::FrameTypeName::get_module($frame_type);
-    Module::Load::load($frame_class);
+    Module::Load::load($frame_class) if !$frame_class->can('new');
 
     return Net::WebSocket::Message->new(
         $frame_class->new(

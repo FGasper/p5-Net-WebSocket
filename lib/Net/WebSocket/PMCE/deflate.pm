@@ -170,7 +170,7 @@ sub create_data_object {
     my ($self) = @_;
 
     my $class = __PACKAGE__ . '::Data::' . $self->_ENDPOINT_CLASS();
-    Module::Load::load($class);
+    Module::Load::load($class) if !$class->can('new');
 
     return $class->new( %$self );
 }

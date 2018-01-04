@@ -249,10 +249,11 @@ sub _handle_unrecognized_extension {
 
 
 sub _create_key {
-    Module::Load::load('MIME::Base64') if !MIME::Base64->can('encode');
+    require MIME::Base64;
 
     #NB: Not cryptographically secure, but it should be good enough
-    #for the purpose of a nonce.
+    #for the purpose of a nonce. Most implementations use TLS anyway,
+    #so this is kind of pointless except that the RFC mandates it. :-/
     my $sixteen_bytes = pack 'S8', map { rand 65536 } 1 .. 8;
 
     my $b64 = MIME::Base64::encode_base64($sixteen_bytes);

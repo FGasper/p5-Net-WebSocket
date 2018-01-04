@@ -48,7 +48,7 @@ use Net::WebSocket::Frame::continuation ();
 sub new {
     my ($class, $data_obj, $frame_class) = @_;
 
-    Module::Load::load($frame_class);
+    Module::Load::load($frame_class) if !$frame_class->can('new');
 
     my $self = {
         _data_obj => $data_obj,

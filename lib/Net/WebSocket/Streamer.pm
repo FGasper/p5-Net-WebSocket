@@ -119,13 +119,11 @@ sub _load_frame_class {
         $frame_class = $frame_class->();
     }
     else {
-        Module::Load::load('Net::WebSocket::FrameTypeName');
+        require Net::WebSocket::FrameTypeName;
         $frame_class = Net::WebSocket::FrameTypeName::get_module($type);
     }
 
-    if (!$frame_class->can('new')) {
-        Module::Load::load($frame_class);
-    }
+    Module::Load::load($frame_class) if !$frame_class->can('new');
 
     return $frame_class;
 }

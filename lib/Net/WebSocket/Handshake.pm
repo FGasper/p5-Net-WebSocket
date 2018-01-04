@@ -22,7 +22,6 @@ This base class is NOT directly instantiable.
 
 use Digest::SHA1 ();
 use HTTP::Headers::Util ();
-use Module::Load ();
 
 use Net::WebSocket::HTTP ();
 use Net::WebSocket::X ();
@@ -267,7 +266,7 @@ sub _missing_generic_headers {
 sub _consume_sec_websocket_extensions_header {
     my ($self, $value) = @_;
 
-    Module::Load::load('Net::WebSocket::Handshake::Extension');
+    require Net::WebSocket::Handshake::Extension;
 
     for my $xtn ( Net::WebSocket::Handshake::Extension->parse_string($value) ) {
         my $xtn_token = $xtn->token();

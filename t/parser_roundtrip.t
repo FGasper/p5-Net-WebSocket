@@ -11,6 +11,7 @@ use Test::More;
 use Test::NoWarnings;
 
 use File::Temp ();
+use Module::Load ();
 
 use IO::Framed::Read ();
 

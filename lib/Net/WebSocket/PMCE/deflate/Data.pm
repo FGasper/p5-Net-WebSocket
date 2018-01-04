@@ -5,8 +5,6 @@ use warnings;
 
 use parent qw( Net::WebSocket::PMCE::Data );
 
-use Module::Load ();
-
 use Net::WebSocket::FrameTypeName ();
 use Net::WebSocket::Message ();
 use Net::WebSocket::PMCE::deflate::Constants ();
@@ -111,7 +109,7 @@ sub create_streamer {
 
     $self->{'_streamer_mode'} = 1;
 
-    Module::Load::load('Net::WebSocket::PMCE::deflate::Data::Streamer');
+    require Net::WebSocket::PMCE::deflate::Data::Streamer;
 
     my $frame_class = Net::WebSocket::FrameTypeName::get_module($frame_type);
 
@@ -235,23 +233,12 @@ sub _compress {
 
 #----------------------------------------------------------------------
 
-my $zlib_is_loaded;
-
-sub _load_zlib_if_needed {
-    $zlib_is_loaded ||= do {
-        Module::Load::load('Compress::Raw::Zlib');
-        1;
-    };
-
-    return;
-}
-
 sub _create_inflate_obj {
     my ($self) = @_;
 
     my $window_bits = $self->{'inflate_max_window_bits'} || ( Net::WebSocket::PMCE::deflate::Constants::VALID_MAX_WINDOW_BITS() )[-1];
 
-    _load_zlib_if_needed();
+    require Compress::Raw::Zlib;
 
     my ($inflate, $istatus) = Compress::Raw::Zlib::Inflate->new(
         -WindowBits => -$window_bits,
@@ -267,7 +254,7 @@ sub _create_deflate_obj {
 
     my $window_bits = $self->{'deflate_max_window_bits'} || ( Net::WebSocket::PMCE::deflate::Constants::VALID_MAX_WINDOW_BITS() )[-1];
 
-    _load_zlib_if_needed();
+    require Compress::Raw::Zlib;
 
     my ($deflate, $dstatus) = Compress::Raw::Zlib::Deflate->new(
         -WindowBits => -$window_bits,

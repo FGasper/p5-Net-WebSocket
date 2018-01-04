@@ -111,7 +111,7 @@ sub _consume_peer_header {
         $self->{'key'} = $value;
     }
     elsif ($name eq 'sec-websocket-protocol') {
-        Module::Load::load('Net::WebSocket::HTTP');
+        require Net::WebSocket::HTTP;
 
         for my $token ( Net::WebSocket::HTTP::split_tokens($value) ) {
             if (!defined $self->{'_subprotocol'}) {
