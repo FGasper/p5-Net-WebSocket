@@ -117,18 +117,19 @@ this module, but it will make your life easier.
 Translate WebSocket frames out of a filehandle into useful data for
 your application.
 
-=item Net::WebSocket::Frame::*
-
-Useful for creating raw frames. For data frames (besides continuation),
-these will be your bread-and-butter. See L<Net::WebSocket::Frame::text>
-for sample usage.
-
 =item L<Net::WebSocket::Streamer::Server>
 
 =item L<Net::WebSocket::Streamer::Client>
 
 Useful for sending streamed (fragmented) data rather than
 a full message in a single frame.
+
+=item Net::WebSocket::Frame::*
+
+Useful for creating raw frames. You probably shouldn’t call this
+class directly; instead, use Endpoint’s C<create_message()> method.
+But if you want to dig deeply, these will be your bread and butter.
+See L<Net::WebSocket::Frame::text> for sample usage.
 
 =back
 
@@ -157,11 +158,9 @@ which don’t mask.
 
 This module used to do this with L<Bytes::Random::Secure::Tiny>, but
 that seems like overkill given that the masking is only there to accommodate
-peculiarities of certain proxies. We now just use Perl’s C<rand()>
-built-in.
-
-(You should probably use TLS if cryptographically secure masking is something
-you actually care about?)
+peculiarities of certain proxies. Moreover, TLS is widely available and free
+now, and it will effectively randomize the data stream anyway.
+So, nowadays we just use Perl’s C<rand()> built-in.
 
 =head2 Text vs. Binary
 
@@ -172,9 +171,9 @@ Recall that in some languages—like JavaScript!—the difference between
 
 CPAN’s L<IO::Framed> provides a straightforward interface for chunking up
 data from byte streams into frames. It also provides a write buffer for
-non-blocking writes, and it retries on EINTR. You don’t have to use it
-(which is why it’s not listed as a requirement), but you’ll need to provide
-a compatible interface if you don’t.
+non-blocking writes, and it (by default) retries on EINTR. You don’t have to
+use it (which is why it’s not listed as a requirement), but you’ll need to
+provide a compatible interface if you don’t.
 
 See the demo scripts that use L<IO::Framed> for an example of when you may
 need a different solution here.
