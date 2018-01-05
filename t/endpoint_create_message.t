@@ -21,7 +21,7 @@ is(
 );
 my $frame = ($msg->get_frames())[0];
 isa_ok( $frame, 'Net::WebSocket::Frame::text', '… and that frame is typed as expected' );
-like( $frame->get_mask_bytes(), qr<\A....\z>, '… and that frame is masked' );
+ok( length($frame->get_mask_bytes()), '… and that frame is masked' );
 
 $msg = Net::WebSocket::Endpoint::Server->create_message( 'binary', 'Hello!' );
 isa_ok( $msg, 'Net::WebSocket::Message', 'client create_message' );
