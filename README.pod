@@ -34,8 +34,8 @@ Net::WebSocket - WebSocket in Perl
         out => $iof,
     );
 
-    $iof_w->write(
-        Net::WebSocket::Frame::text->new( payload => 'Hello, world' )
+    $iof->write(
+        $ept->create_message( 'text', 'Hello, world' )->to_bytes()
     );
 
     #Determine that $inet can be read from …
@@ -88,9 +88,9 @@ Here are the main modules:
 
 =item L<Net::WebSocket::Handshake::Client>
 
-Logic for handshakes. Every application needs one of these. As of version
-0.5 this handles all headers and can also do
-subprotocol and extension negotiation for you.
+Logic for handshakes. Every application needs one of these.
+This handles all headers and can also negotiate
+subprotocols and extensions for you.
 
 =item L<Net::WebSocket::HTTP_R>
 
@@ -122,8 +122,8 @@ a full message in a single frame.
 
 =item Net::WebSocket::Frame::*
 
-Useful for creating raw frames. You probably shouldn’t call this
-class directly; instead, use Endpoint’s C<create_message()> method.
+Useful for creating raw frames. You probably shouldn’t call these
+classes directly; instead, use Endpoint’s C<create_message()> method.
 But if you want to dig deeply, these will be your bread and butter.
 See L<Net::WebSocket::Frame::text> for sample usage.
 
@@ -154,9 +154,9 @@ which don’t mask.
 
 This module used to do this with L<Bytes::Random::Secure::Tiny>, but
 that seems like overkill given that the masking is only there to accommodate
-peculiarities of certain proxies. Moreover, TLS is widely available and free
-now, and it will effectively randomize the data stream anyway.
-So, nowadays we just use Perl’s C<rand()> built-in.
+peculiarities of certain proxies. Moreover, TLS is widely available and
+L<free now besides|https://letsencrypt.org>, and it will randomize the data
+stream anyway. So, nowadays we just use Perl’s C<rand()> built-in.
 
 =head2 Text vs. Binary
 
@@ -184,6 +184,7 @@ protocol, all of which Net::WebSocket supports:
 =item * The three reserved bits in each frame’s header.
 (See L<Net::WebSocket::Frame>.) This is used, e.g., in the
 L<permessage-deflate extension|https://tools.ietf.org/html/rfc7692>.
+(See below for its implementation in Net::WebSocket.)
 
 =item * Additional opcodes: 3-7 and 11-15. You’ll need to subclass
 L<Net::WebSocket::Frame> for this, and you will likely want to subclass
@@ -203,14 +204,14 @@ can do in your application.
 
 =head2 permessage-deflate
 
-Net::WebSocket 0.5 introduces support for the permessage-delate extension
-to allow compressed messages over WebSocket. See
-L<Net::WebSocket::PMCE::deflate> for more details.
+Net::WebSocket fully supports the permessage-deflate (compression) extension.
+See L<Net::WebSocket::PMCE::deflate> for details.
 
 =head1 TODO
 
 At this point Net::WebSocket seems to support everything the WebSocket
-protocol can (usefully) do, including compression.
+protocol can (usefully) do, including compression. Please file bug reports
+for any issues that may crop up.
 
 =over
 
@@ -244,7 +245,7 @@ Felipe Gasper (FELIPE)
 
 =head1 COPYRIGHT
 
-Copyright 2017 by L<Gasper Software Consulting|http://gaspersoftware.com>
+Copyright 2018 by L<Gasper Software Consulting|http://gaspersoftware.com>
 
 =head1 LICENSE
 

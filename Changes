@@ -1,5 +1,8 @@
 Revision history for Perl module Net::WebSocket
 
+0.14 Fri Jan 26 2018
+- Documentation tweaks/cleanup
+
 0.13 Fri Jan 5 2018
 - Test fix - no production changes
 
