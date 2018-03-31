@@ -15,16 +15,37 @@ plan tests => 1 + 4;
 use FindBin;
 use IO::Framed::Read;
 use IO::Framed::Write;
-use File::Slurp;
 use File::Temp;
-use Text::Control;
+#use Text::Control;
 
 use Net::WebSocket::Parser ();
-use Net::WebSocket::Endpoint::Server ();
+use Net::WebSocket::Endpoint::Client ();
 
-my $in = File::Slurp::read_file("$FindBin::Bin/assets/fragmented_binary");
-$in =~ tr<\n><>d;
-$in = Text::Control::from_hex($in);
+#my $in = File::Slurp::read_file("$FindBin::Bin/assets/fragmented_binary");
+#$in =~ tr<\n><>d;
+#$in = Text::Control::from_hex($in);
+
+my $in = join( q<>,
+    "\x02\x7f",
+    "\x00\x00\x00\x00\x00\x01\xff\xb5", #130997
+    ("a" x 130997),
+    "\x00\x7f",
+    "\x00\x00\x00\x00\x00\x02\x00\x00",
+    ("b" x 131072),
+    "\x00\x7f",
+    "\x00\x00\x00\x00\x00\x02\x00\x00",
+    ("c" x 131072),
+    "\x80\x7e",
+    ".\x8f",
+    ("d" x 11919),
+);
+
+my $should_be = join( q<>,
+    ("a" x 130997),
+    ("b" x 131072),
+    ("c" x 131072),
+    ("d" x 11919),
+);
 
 my ($fh, $path) = File::Temp::tempfile( CLEANUP => 1 );
 print {$fh} $in;
@@ -37,7 +58,7 @@ my $parser = Net::WebSocket::Parser->new( $io );
 open my $out_fh, '>', \do { my $v = q<> };
 my $io_out = IO::Framed::Write->new($out_fh);
 
-my $ept = Net::WebSocket::Endpoint::Server->new(
+my $ept = Net::WebSocket::Endpoint::Client->new(
     parser => $parser,
     out => $io_out,
 );
@@ -63,8 +84,6 @@ is(
 my $msg = $ept->get_next_message();
 
 my @frames = $msg->get_frames();
-
-my $should_be = File::Slurp::read_file("$FindBin::Bin/assets/fragmented_binary_should_be");
 
 is(
     $msg->get_payload(),

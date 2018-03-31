@@ -1,5 +1,8 @@
 Revision history for Perl module Net::WebSocket
 
+0.17 Sat Mar 31 2018
+- Remove Text::Control dependency (and large files) from new fragmentation test
+
 0.16 Fri Mar 30 2018
 - Fix fragmentation bug: frames of a fragmented message all had the same
   meta-parts.
