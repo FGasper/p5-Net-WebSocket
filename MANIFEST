@@ -74,6 +74,8 @@ lib/Net/WebSocket/X/UnknownExtension.pm
 lib/Net/WebSocket/X/UnknownSubprotocol.pm
 lib/Net/WebSocket/X/UnsupportedProtocolVersion.pm
 t/Net-WebSocket-HTTP.t
+t/assets/fragmented_binary
+t/assets/fragmented_binary_should_be
 t/constants.t
 t/create_frame.t
 t/endpoint_allow_empty_read.t
@@ -83,6 +85,7 @@ t/endpoint_close.t
 t/endpoint_create_message.t
 t/endpoint_missing_continuation.t
 t/endpoint_pong_reset.t
+t/fragmented_binary.t
 t/frame_length_encoding.t
 t/frame_methods.t
 t/handshake.t

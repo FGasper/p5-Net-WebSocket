@@ -113,7 +113,7 @@ sub new {
 
 #Create these out here so that we don’t create/destroy them on each frame.
 #As long as we don’t access them prior to writing to them this is fine.
-my ($first2, $oct1, $oct2, $len, $mask_size, $mask_buf, $len_len, $len_buf, $longs, $long);
+my ($oct1, $oct2, $len, $mask_size, $len_len, $longs, $long);
 
 sub get_next_frame {
     my ($self) = @_;
@@ -124,7 +124,7 @@ sub get_next_frame {
     #that considers q<> falsey but '0' truthy. :-/
     #That aside, if indeed all we read is '0', then we know that’s not
     #enough, and we can return.
-    $first2 = $self->_read_with_buffer(2);
+    my $first2 = $self->_read_with_buffer(2);
     if (!$first2) {
         return defined($first2) ? q<> : undef;
     }
@@ -136,6 +136,8 @@ sub get_next_frame {
     $mask_size = ($oct2 & 0x80) && 4;
 
     $len_len = ($len == 0x7e) ? 2 : ($len == 0x7f) ? 8 : 0;
+
+    my ($len_buf, $mask_buf);
 
     if ($len_len) {
         $len_buf = $self->_read_with_buffer($len_len);

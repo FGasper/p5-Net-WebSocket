@@ -37,10 +37,12 @@ WriteMakefile1(
 
     TEST_REQUIRES => {
         'autodie'         => 0,
+        'FindBin'         => 0,
         'Test::More'      => 0,
         'Test::Exception' => 0,
         'Test::Deep' => 0,
         'Test::NoWarnings' => 0,
+        'Text::Control' => 0,
         'Time::HiRes' => 0,
         'File::Temp' => 0,
         'File::Slurp' => 0,

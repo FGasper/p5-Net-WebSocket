@@ -1,5 +1,9 @@
 Revision history for Perl module Net::WebSocket
 
+0.16 Fri Mar 30 2018
+- Fix fragmentation bug: frames of a fragmented message all had the same
+  meta-parts.
+
 0.15 Fri Mar 16 2018
 - Copyright update (no functional changes)
 
