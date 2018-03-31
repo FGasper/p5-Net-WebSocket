@@ -16,14 +16,9 @@ use FindBin;
 use IO::Framed::Read;
 use IO::Framed::Write;
 use File::Temp;
-#use Text::Control;
 
 use Net::WebSocket::Parser ();
 use Net::WebSocket::Endpoint::Client ();
-
-#my $in = File::Slurp::read_file("$FindBin::Bin/assets/fragmented_binary");
-#$in =~ tr<\n><>d;
-#$in = Text::Control::from_hex($in);
 
 my $in = join( q<>,
     "\x02\x7f",
