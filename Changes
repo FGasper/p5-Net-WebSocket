@@ -1,5 +1,8 @@
 Revision history for Perl module Net::WebSocket
 
+0.18
+- Refactor of Endpoint’s defragmenting logic.
+
 0.17 Sat Mar 31 2018
 - Remove Text::Control dependency (and large files) from new fragmentation test
 

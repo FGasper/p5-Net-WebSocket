@@ -3,15 +3,52 @@ package Net::WebSocket::Defragmenter;
 use strict;
 use warnings;
 
-# This class isn’t meant for public consumption (yet).
+=encoding utf-8
+
+=head1 NAME
+
+Net::WebSocket::Defragmenter
+
+=head1 SYNOPSIS
+
+    my $defragger = Net::WebSocket::Defragmenter->new(
+        parser => $parser_obj,  #i.e., isa Net::WebSocket::Parser
+
+        #Optional; these two receive the Net::WebSocket::Frame object.
+        on_control_frame => sub { ... },
+        on_data_frame => sub { ... },
+
+        #Optional; receives a type string and a human-readable message.
+        #An exception is thrown after this callback runs.
+        on_protocol_error => sub { ... },
+    );
+
+    my $msg_or_undef = $defragger->get_next_message();
+
+=head1 DESCRIPTION
+
+You ordinarily shouldn’t instantiate this class because
+L<Net::WebSocket::Endpoint> already uses it.
+
+This class implements WebSocket’s defragmentation logic.
+It’s mostly meant for internal use but is documented for cases
+where L<Net::WebSocket::Endpoint> may not be usable or desirable.
+
+=cut
+
+=head1 METHODS
+
+=head2 I<CLASS>->new( %OPTS )
+
+See SYNOPSIS above.
+
+=cut
 
 sub new {
     my ($class, %opts) = @_;
 
     my %self = (
         _fragments => [],
-
-        _parser => $opts{'parser'},
 
         ( map { ( "_$_" => $opts{$_} ) } (
             'parser',
@@ -23,6 +60,17 @@ sub new {
 
     return bless \%self, $class;
 }
+
+=head2 I<OBJ>->get_next_message()
+
+Reads a frame from C<parser>.
+
+Returns a L<Net::WebSocket::Message> object if there is a message
+ready to return; otherwise returns undef.
+
+An exception (L<Net::WebSocket::X>) is thrown on fragmentation errors.
+
+=cut
 
 sub get_next_message {
     my ($self) = @_;
