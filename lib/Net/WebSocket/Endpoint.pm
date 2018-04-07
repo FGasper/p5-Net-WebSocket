@@ -15,6 +15,7 @@ See L<Net::WebSocket::Endpoint::Server>.
 use strict;
 use warnings;
 
+use Net::WebSocket::Defragmenter ();
 use Net::WebSocket::Frame::close ();
 use Net::WebSocket::Frame::ping ();
 use Net::WebSocket::Frame::pong ();
@@ -35,15 +36,41 @@ sub new {
         die "“out” ($opts{'out'}) needs a write() method!";
     }
 
-    my $self = {
-        _fragments => [],
+    my $self;
 
+    my $defragger = Net::WebSocket::Defragmenter->new(
+        parser => $opts{'parser'},
+
+        on_data_frame => $opts{'on_data_frame'},
+
+        on_control_frame => sub {
+            $self->_handle_control_frame(shift);
+        },
+
+        on_protocol_error => sub {
+            ( undef, my $msg ) = @_;
+
+            #For now … there may be some multiplexing extension
+            #that allows some other behavior down the line,
+            #but let’s enforce standard protocol for now.
+            my $err_frame = Net::WebSocket::Frame::close->new(
+                code => 'PROTOCOL_ERROR',
+                reason => $msg,
+                $self->FRAME_MASK_ARGS(),
+            );
+
+            $self->_write_frame($err_frame);
+        },
+    );
+
+    $self = {
         _max_pings => $class->DEFAULT_MAX_PINGS(),
 
         _ping_store => Net::WebSocket::PingStore->new(),
 
+        _defragger => $defragger,
+
         (map { defined($opts{$_}) ? ( "_$_" => $opts{$_} ) : () } qw(
-            parser
             max_pings
 
             on_data_frame
@@ -60,52 +87,13 @@ sub get_next_message {
 
     $self->_verify_not_closed();
 
-    my $_msg_frame;
-
-    if ( $_msg_frame = $self->{'_parser'}->get_next_frame() ) {
-        if ($_msg_frame->is_control()) {
-            $self->_handle_control_frame($_msg_frame);
-        }
-        else {
-            if ($self->{'_on_data_frame'}) {
-                $self->{'_on_data_frame'}->($_msg_frame);
-            }
-
-            #Failure cases:
-            #   - continuation without prior fragment
-            #   - non-continuation within fragment
-
-            if ( $_msg_frame->get_type() eq 'continuation' ) {
-                if ( !@{ $self->{'_fragments'} } ) {
-                    $self->_got_continuation_during_non_fragment($_msg_frame);
-                }
-            }
-            elsif ( @{ $self->{'_fragments'} } ) {
-                $self->_got_non_continuation_during_fragment($_msg_frame);
-            }
-
-            if ($_msg_frame->get_fin()) {
-                return Net::WebSocket::Message->new(
-                    splice( @{ $self->{'_fragments'} } ),
-                    $_msg_frame,
-                );
-            }
-            else {
-                push @{ $self->{'_fragments'} }, $_msg_frame;
-            }
-        }
-
-        $_msg_frame = undef;
-    }
-
-    return defined($_msg_frame) ? q<> : undef;
+    return $self->{'_defragger'}->get_next_message();
 }
 
 sub create_message {
     my ($self, $frame_type, $payload) = @_;
 
     require Net::WebSocket::FrameTypeName;
-    require Net::WebSocket::Message;
 
     my $frame_class = Net::WebSocket::FrameTypeName::get_module($frame_type);
     Module::Load::load($frame_class) if !$frame_class->can('new');
@@ -221,44 +209,6 @@ sub on_pong {
 }
 
 #----------------------------------------------------------------------
-
-sub _got_continuation_during_non_fragment {
-    my ($self, $frame) = @_;
-
-    my $msg = sprintf('Received continuation outside of fragment!');
-
-    #For now … there may be some multiplexing extension
-    #that allows some other behavior down the line,
-    #but let’s enforce standard protocol for now.
-    my $err_frame = Net::WebSocket::Frame::close->new(
-        code => 'PROTOCOL_ERROR',
-        reason => $msg,
-        $self->FRAME_MASK_ARGS(),
-    );
-
-    $self->_write_frame($err_frame);
-
-    die Net::WebSocket::X->create( 'ReceivedBadControlFrame', $msg );
-}
-
-sub _got_non_continuation_during_fragment {
-    my ($self, $frame) = @_;
-
-    my $msg = sprintf('Received %s; expected continuation!', $frame->get_type());
-
-    #For now … there may be some multiplexing extension
-    #that allows some other behavior down the line,
-    #but let’s enforce standard protocol for now.
-    my $err_frame = Net::WebSocket::Frame::close->new(
-        code => 'PROTOCOL_ERROR',
-        reason => $msg,
-        $self->FRAME_MASK_ARGS(),
-    );
-
-    $self->_write_frame($err_frame);
-
-    die Net::WebSocket::X->create( 'ReceivedBadDataFrame', $msg );
-}
 
 sub _verify_not_closed {
     my ($self) = @_;

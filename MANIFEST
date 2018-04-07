@@ -17,6 +17,7 @@ lib/Net/WebSocket/Base/DataFrame.pm
 lib/Net/WebSocket/Base/ReadString.pm
 lib/Net/WebSocket/Base/Typed.pm
 lib/Net/WebSocket/Constants.pm
+lib/Net/WebSocket/Defragmenter.pm
 lib/Net/WebSocket/Endpoint.pm
 lib/Net/WebSocket/Endpoint/Client.pm
 lib/Net/WebSocket/Endpoint/Server.pm
