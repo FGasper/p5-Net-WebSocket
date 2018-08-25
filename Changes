@@ -1,5 +1,8 @@
 Revision history for Perl module Net::WebSocket
 
+0.19
+- Fix LICENSE file (again)
+
 0.18
 - Refactor of Endpoint’s defragmenting logic to potentially be useful
   without the HTTP-derived handshake.
