@@ -219,15 +219,17 @@ sub get_next_frame {
     return $frame_class->create_from_parse(\$first2, \$len_buf, \$mask_buf, \$payload);
 }
 
-#This will only return exactly the number of bytes requested.
-#If fewer than we want are available, then we return undef.
-#
-#NB: This predates IO::Framed and might be due for a simplification.
+# This will only return exactly the number of bytes requested.
+# If fewer than we want are available, then we return undef.
+# This incorporates the partial-frame buffer, which keeps get_next_frame()
+# a bit simpler than it otherwise might be.
 #
 sub _read_with_buffer {
     my ($self, $length) = @_;
 
-    #Prioritize the case where we read everything we need.
+    # Prioritize the case where we have everything we need.
+    # This will happen if, e.g., we got a partial frame on first read
+    # and a subsequent read has to pick back up.
 
     if ( length($self->{'_partial_frame'}) < $length ) {
         my $deficit = $length - length($self->{'_partial_frame'});
