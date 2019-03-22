@@ -50,6 +50,8 @@ for my $t (@tests) {
     if ($^O eq 'MSWin32'){
         require Win32::Socketpair;
         ($rdr, $wtr) = Win32::Socketpair::winsocketpair();
+        die "no reader!" if !$rdr;
+        die "no writer!" if !$wtr;
     }
     else {
         pipe $rdr, $wtr;
