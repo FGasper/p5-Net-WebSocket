@@ -12,6 +12,9 @@ WriteMakefile1(
                 url => 'git://github.com/FGasper/p5-Net-WebSocket.git',
                 web => 'https://github.com/FGasper/p5-Net-WebSocket',
             },
+            bugtracker => {
+                web => 'https://github.com/FGasper/p5-Net-WebSocket/issues',
+            },
         },
     },
 
