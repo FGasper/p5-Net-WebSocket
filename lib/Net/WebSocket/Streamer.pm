@@ -53,7 +53,7 @@ a full package name to C<new()> rather than merely C<text> or C<binary>.
 use strict;
 use warnings;
 
-use Module::Load ();
+use Module::Runtime ();
 
 use Net::WebSocket::Frame::continuation ();
 use Net::WebSocket::X ();
@@ -123,7 +123,7 @@ sub _load_frame_class {
         $frame_class = Net::WebSocket::FrameTypeName::get_module($type);
     }
 
-    Module::Load::load($frame_class) if !$frame_class->can('new');
+    Module::Runtime::require_module($frame_class) if !$frame_class->can('new');
 
     return $frame_class;
 }

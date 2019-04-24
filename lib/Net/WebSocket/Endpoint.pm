@@ -15,6 +15,8 @@ See L<Net::WebSocket::Endpoint::Server>.
 use strict;
 use warnings;
 
+use Module::Runtime ();
+
 use Net::WebSocket::Defragmenter ();
 use Net::WebSocket::Frame::close ();
 use Net::WebSocket::Frame::ping ();
@@ -96,7 +98,7 @@ sub create_message {
     require Net::WebSocket::FrameTypeName;
 
     my $frame_class = Net::WebSocket::FrameTypeName::get_module($frame_type);
-    Module::Load::load($frame_class) if !$frame_class->can('new');
+    Module::Runtime::require_module($frame_class) if !$frame_class->can('new');
 
     return Net::WebSocket::Message->new(
         $frame_class->new(

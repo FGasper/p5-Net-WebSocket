@@ -84,7 +84,7 @@ decompress so that that detail is abstracted away.
 use strict;
 use warnings;
 
-use Module::Load ();
+use Module::Runtime ();
 
 use Net::WebSocket::Constants ();
 use Net::WebSocket::X ();
@@ -211,7 +211,7 @@ sub get_next_frame {
             die "$self: Unrecognized frame opcode: “$opcode”";
         }
 
-        Module::Load::load($class) if !$class->can('new');
+        Module::Runtime::require_module($class) if !$class->can('new');
 
         $class;
     };

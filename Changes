@@ -1,9 +1,14 @@
 Revision history for Perl module Net::WebSocket
 
-0.19
+0.20 Wed Apr 24 2019
+- Fix test that fails now that X::Tiny no longer uses Module::Load.
+- Switch from Module::Load to Module::Runtime.
+- Replace README.pod with README.md.
+
+0.19 Fri Aug 24 2018
 - Fix LICENSE file (again)
 
-0.18
+0.18 Fri Aug 24 2018
 - Refactor of Endpoint’s defragmenting logic to potentially be useful
   without the HTTP-derived handshake.
 - Fix LICENSE file.

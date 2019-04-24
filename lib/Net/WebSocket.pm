@@ -1,6 +1,6 @@
 package Net::WebSocket;
 
-our $VERSION = '0.19';
+our $VERSION = '0.20';
 
 =encoding utf-8
 
@@ -249,7 +249,7 @@ Felipe Gasper (FELIPE)
 
 =head1 COPYRIGHT
 
-Copyright 2018 by L<Gasper Software Consulting|http://gaspersoftware.com>
+Copyright 2018-2019 by L<Gasper Software Consulting|http://gaspersoftware.com>
 
 =head1 LICENSE
 

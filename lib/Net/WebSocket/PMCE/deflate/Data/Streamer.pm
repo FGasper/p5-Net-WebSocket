@@ -37,7 +37,7 @@ pattern as L<Net::WebSocket::Streamer>.
 
 =cut
 
-use Module::Load ();
+use Module::Runtime ();
 
 use Net::WebSocket::Frame::continuation ();
 
@@ -48,7 +48,7 @@ use Net::WebSocket::Frame::continuation ();
 sub new {
     my ($class, $data_obj, $frame_class) = @_;
 
-    Module::Load::load($frame_class) if !$frame_class->can('new');
+    Module::Runtime::require_module($frame_class) if !$frame_class->can('new');
 
     my $self = {
         _data_obj => $data_obj,

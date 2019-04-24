@@ -6,7 +6,7 @@ use warnings;
 use Test::More;
 use Test::NoWarnings;
 
-use Module::Load ();
+use Module::Runtime ();
 
 use Net::WebSocket::Frame ();
 
@@ -40,7 +40,7 @@ plan tests => 1 + @tests;
 for my $t (@tests) {
     my ($type, @args) = @{ $t->[1] };
     my $class = "Net::WebSocket::Frame::$type";
-    Module::Load::load($class);
+    Module::Runtime::require_module($class);
 
     my $frame = $class->new( @args );
 

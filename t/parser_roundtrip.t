@@ -11,7 +11,7 @@ use Test::More;
 use Test::NoWarnings;
 
 use File::Temp ();
-use Module::Load ();
+use Module::Runtime ();
 
 use IO::Framed::Read ();
 
@@ -54,7 +54,7 @@ plan tests => 1 + @frames_to_test;
 
 for my $frame_t (@frames_to_test) {
     my $class = "Net::WebSocket::Frame::$frame_t->{'type'}";
-    Module::Load::load($class);
+    Module::Runtime::require_module($class);
     my $frame = $class->new(
         payload => $frame_t->{'payload'},
     );

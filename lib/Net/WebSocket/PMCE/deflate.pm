@@ -34,7 +34,7 @@ use warnings;
 
 use parent qw( Net::WebSocket::PMCE::deflate::Constants );
 
-use Module::Load ();
+use Module::Runtime ();
 
 use Net::WebSocket::Handshake::Extension ();
 use Net::WebSocket::PMCE::deflate::Constants ();
@@ -170,7 +170,7 @@ sub create_data_object {
     my ($self) = @_;
 
     my $class = __PACKAGE__ . '::Data::' . $self->_ENDPOINT_CLASS();
-    Module::Load::load($class) if !$class->can('new');
+    Module::Runtime::require_module($class) if !$class->can('new');
 
     return $class->new( %$self );
 }
