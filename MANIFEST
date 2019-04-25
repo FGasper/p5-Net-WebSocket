@@ -7,6 +7,7 @@ Makefile.PL
 README.md
 demo/123_server.pl
 demo/echo_server.pl
+demo/lib/MockReader.pm
 demo/lib/NWDemo.pm
 demo/shell_server.pl
 demo/wscat.pl
@@ -75,6 +76,7 @@ lib/Net/WebSocket/X/UnknownExtension.pm
 lib/Net/WebSocket/X/UnknownSubprotocol.pm
 lib/Net/WebSocket/X/UnsupportedProtocolVersion.pm
 t/Net-WebSocket-HTTP.t
+t/close_frame.t
 t/constants.t
 t/create_frame.t
 t/endpoint_allow_empty_read.t
