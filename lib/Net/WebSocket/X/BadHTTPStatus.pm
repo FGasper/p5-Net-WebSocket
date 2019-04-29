@@ -10,7 +10,7 @@ use parent qw( Net::WebSocket::X::Base );
 sub _new {
     my ($class, $code, $reason) = @_;
 
-    my $str = "Received invalid HTTP status: $status";
+    my $str = "Received invalid HTTP status: $code";
     $str .= " ($reason)" if defined $reason;
 
     $str .= " - must be " . Net::WebSocket::Constants::REQUIRED_HTTP_STATUS();
