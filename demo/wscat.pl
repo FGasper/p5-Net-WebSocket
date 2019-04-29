@@ -223,7 +223,7 @@ sub run {
         },
 
         on_close => sub {
-            $ept->shutdown( code => 'SUCCESS' );
+            $ept->shutdown( code => 'SUCCESS' ) if $ept;
             $handle->flush();
 
             $closed = 1;
