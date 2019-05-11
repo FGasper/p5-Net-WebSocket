@@ -32,7 +32,7 @@ use Net::WebSocket::HTTP_R ();
 use constant {
     MAX_CHUNK_SIZE => 64000,
     CRLF => "\x0d\x0a",
-    DEBUG => 0,
+    DEBUG => 1,
 
     SEND_FRAME_CLASS => 'Net::WebSocket::Frame::binary',
 };
