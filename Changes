@@ -3,6 +3,9 @@ Revision history for Perl module Net::WebSocket
 0.21
 - Supply missing “MockReader” module for demos.
 - Add a test for close frames.
+- Fix typo in BadHTTPStatus exception.
+- Require a current IO::Framed version.
+- POD fixes (thank you, MANWAR!)
 
 0.20 Wed Apr 24 2019
 - Fix test that fails now that X::Tiny no longer uses Module::Load.
