@@ -14,6 +14,8 @@ use constant {
     _DEBUG => 0,
 };
 
+=encoding utf-8
+
 =head2 I<CLASS>->new( %OPTS )
 
 %OPTS is:
