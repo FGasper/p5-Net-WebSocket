@@ -53,8 +53,6 @@ In general this should be fine, but if, for some reason, you want to
 insist that the client compress with no more than 10 window bits,
 then at this point you can fail the connection.
 
-=back
-
 =cut
 
 use parent qw(
