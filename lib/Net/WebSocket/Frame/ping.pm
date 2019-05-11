@@ -2,7 +2,7 @@ package Net::WebSocket::Frame::ping;
 
 =encoding utf-8
 
-=head1
+=head1 NAME
 
 Net::WebSocket::Frame:ping:
 

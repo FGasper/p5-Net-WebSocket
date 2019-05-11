@@ -51,6 +51,8 @@ connection.
 =item * C<extensions> - A list of extension objects that the Handshake
 object will interact with to determine extension support.
 
+=back
+
 =head1 COMMON EXTENSION INTERFACE
 
 Each object in the C<extensions> array must implement the following methods:
@@ -70,7 +72,7 @@ value from its C<ok_to_use()> method.
 
 =item * C<ok_to_use()> A boolean that indicates whether the peer indicates
 proper support for the extension. This should not be called until after
-C<consume_parameters().
+C<consume_parameters()>.
 
 =back
 

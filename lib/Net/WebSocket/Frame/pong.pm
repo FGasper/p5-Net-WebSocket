@@ -2,7 +2,7 @@ package Net::WebSocket::Frame::pong;
 
 =encoding utf-8
 
-=head1
+=head1 NAME
 
 Net::WebSocket::Frame::pong
 
