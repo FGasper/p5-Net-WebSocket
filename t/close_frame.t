@@ -40,3 +40,45 @@ while ( my ($k, $v) = each %{ Net::WebSocket::Constants::STATUS() } ) {
         "$k with just code",
     );
 }
+
+{
+    my @w;
+
+    local $SIG{'__WARN__'} = sub { push @w, @_ };
+
+    Net::WebSocket::Frame::close->new( code => undef, reason => undef );
+
+    is_deeply( \@w, [], 'undef code && undef reason -> no warnings' );
+}
+
+{
+    my @w;
+
+    local $SIG{'__WARN__'} = sub { push @w, @_ };
+
+    Net::WebSocket::Frame::close->new( code => undef, reason => q<> );
+
+    is_deeply( \@w, [], 'undef code && empty reason -> no warnings' );
+}
+
+{
+    my @w;
+
+    local $SIG{'__WARN__'} = sub { push @w, @_ };
+
+    Net::WebSocket::Frame::close->new( code => q<>, reason => q<> );
+
+    is_deeply( \@w, [], 'empty code && empty reason -> no warnings' );
+}
+
+{
+    my @w;
+
+    local $SIG{'__WARN__'} = sub { push @w, @_ };
+
+    Net::WebSocket::Frame::close->new( code => undef, reason => undef );
+
+    is_deeply( \@w, [], 'empty code && undef reason -> no warnings' );
+}
+
+done_testing();

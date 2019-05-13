@@ -2,10 +2,15 @@ Revision history for Perl module Net::WebSocket
 
 0.21
 - Supply missing “MockReader” module for demos.
-- Add a test for close frames.
+- Suppress warning when empty “code” and “reason” are both given to
+  Net::WebSocket::Frame::close constructor.
 - Fix typo in BadHTTPStatus exception.
 - Require a current IO::Framed version.
+- Allow a “headers” argument to handshake header stringifier.
+  This replaces the previously-suggested (hacky) substr().
+- Add a test for close frames.
 - POD fixes (thank you, MANWAR!)
+- Improve wscat.pl demo script.
 
 0.20 Wed Apr 24 2019
 - Fix test that fails now that X::Tiny no longer uses Module::Load.

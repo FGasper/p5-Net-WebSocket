@@ -130,7 +130,7 @@ sub consume_headers {
     return;
 }
 
-=head2 my $hdrs_txt = I<OBJ>->to_string()
+=head2 my $hdrs_txt = I<OBJ>->to_string( %OPTS )
 
 The text of the HTTP headers to send, with the 2nd trailing CR/LF
 that ends the headers portion of an HTTP message.
@@ -139,16 +139,40 @@ If you use this object
 to negotiate a subprotocol and/or extensions, those will be included
 in the output from this method.
 
-To append custom headers, do the following with the result of this method:
+%OPTS can be:
 
-     substr($hdrs_txt, -2, 0) = '..';
+=over
+
+=item * C<headers> - an array reference of key/value pairs. For example:
+
+    [
+        Authorization => 'Basic Basic QWxhZGRpbjpvcGVuIHNlc2FtZQ==',
+        'X-Custom'    => 'some value',
+    ]
+
+=back
 
 =cut
 
 sub to_string {
-    my $self = shift;
+    my ($self, %opts) = @_;
 
-    return join( CRLF(), $self->_create_header_lines(), q<>, q<> );
+    my @extra_lines;
+
+    if (my $hdrs_ar = $opts{'headers'}) {
+        $hdrs_ar = [ @$hdrs_ar ];
+
+        while ( my ($key, $val) = splice( @$hdrs_ar, 0, 2 ) ) {
+            push @extra_lines, "$key: $val";
+        }
+    }
+
+    return join(
+        CRLF(),
+        $self->_create_header_lines(),
+        @extra_lines,
+        q<>, q<>,
+    );
 }
 
 =head1 LEGACY INTERFACE

@@ -150,6 +150,12 @@ sub new {
             }
         }
         else {
+            my $reason = delete $opts{'reason'};
+
+            if (defined $reason && length $reason) {
+                warn "close frame constructor received “reason” ($opts{'reason'}) but no “code”!";
+            }
+
             $payload = q<>;
         }
 

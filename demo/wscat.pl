@@ -8,8 +8,8 @@ use Try::Tiny;
 
 use IO::Events ();
 
+use Getopt::Long ();
 use HTTP::Response;
-use IO::Socket::INET ();
 use Socket ();
 use URI::Split ();
 
@@ -20,8 +20,6 @@ use lib "$FindBin::Bin/lib";
 use MockReader ();
 
 use Net::WebSocket::Endpoint::Client ();
-use Net::WebSocket::Frame::binary ();
-use Net::WebSocket::Frame::close  ();
 use Net::WebSocket::Handshake::Client ();
 use Net::WebSocket::Parser ();
 
@@ -30,12 +28,12 @@ use Net::WebSocket::PMCE::deflate::Client ();
 use Net::WebSocket::HTTP_R ();
 
 use constant {
-    MAX_CHUNK_SIZE => 64000,
     CRLF => "\x0d\x0a",
-    DEBUG => 1,
 
-    SEND_FRAME_CLASS => 'Net::WebSocket::Frame::binary',
+    SEND_FRAME_TYPE => 'binary',
 };
+
+my $DEBUG;
 
 #No PIPE
 use constant ERROR_SIGS => qw( INT HUP QUIT ABRT USR1 USR2 SEGV ALRM TERM );
@@ -43,25 +41,40 @@ use constant ERROR_SIGS => qw( INT HUP QUIT ABRT USR1 USR2 SEGV ALRM TERM );
 run( @ARGV ) if !caller;
 
 sub run {
-    my ($uri) = @_;
+    my (@argv) = @_;
+
+    my %cli_opts;
+
+    Getopt::Long::Configure( 'pass_through' );
+    my $ok = Getopt::Long::GetOptionsFromArray(
+        \@argv,
+        \%cli_opts,
+        'debug',
+        'header|H=s@',
+        'insecure|k',
+    );
+
+    my ($uri) = @argv or die 'Need URI!';
+
+    _debug("URI: “$uri”");
 
     local $SIG{'PIPE'} = 'IGNORE';
-
-    -t \*STDIN or die "STDIN must be a TTY for this demo.\n";
 
     my ($uri_scheme, $uri_authority) = URI::Split::uri_split($uri);
 
     if (!$uri_scheme) {
-        die "Need a URI!\n";
+        die "Need a URI!$/";
     }
 
     if ($uri_scheme !~ m<\Awss?\z>) {
-        die sprintf "Invalid schema: “%s” ($uri)\n", $uri_scheme;
+        die sprintf "Invalid schema: “%s” ($uri)$/", $uri_scheme;
     }
 
     my $inet;
 
     my ($host, $port) = split m<:>, $uri_authority;
+
+    _debug("Opening $uri_scheme connection to $uri_authority …");
 
     if ($uri_scheme eq 'ws') {
         my $iaddr = Socket::inet_aton($host);
@@ -79,13 +92,17 @@ sub run {
             PeerHost => $host,
             PeerPort => $port || 443,
             SSL_hostname => $host,
+            ( $cli_opts{'insecure'} ? (SSL_verify_mode => 0) : () ),
         );
 
         die "IO::Socket::SSL: [$!][$@]\n" if !$inet;
+
     }
     else {
         die "Unknown scheme ($uri_scheme) in URI: “$uri”";
     }
+
+    _debug("Opened connection.");
 
     my $loop = IO::Events::Loop->new();
 
@@ -96,7 +113,7 @@ sub run {
         timeout => 5,
         repetitive => 1,
         on_tick => sub {
-            die "Handshake timeout!\n" if !$ept;
+            die "Handshake timeout!$/" if !$ept;
 
             $ept->check_heartbeat();
 
@@ -119,6 +136,16 @@ sub run {
     my $deflate_hsk = $deflate->get_handshake_object();
     my $deflate_data;
 
+    my $stdout = IO::Events::Handle->new(
+        owner => $loop,
+        handle => \*STDOUT,
+        write => 1,
+    );
+
+    my $stdin;
+
+    my $closed;
+
     $handle = IO::Events::Handle->new(
         owner => $loop,
         handle => $inet,
@@ -135,8 +162,18 @@ sub run {
                 extensions => [$deflate],
             );
 
-            my $hdr = $handshake->to_string();
-            DEBUG && print "SENDING HEADERS:\n$hdr";
+            my @extra_headers;
+
+            if (my $hdrs_ar = $cli_opts{'header'}) {
+                for my $cur_hdr (@$hdrs_ar) {
+                    my ($key, $val) = split m<\s*:\s*>, $cur_hdr, 2;
+                    push @extra_headers, $key => $val;
+                }
+            }
+
+            my $hdr = $handshake->to_string( headers => \@extra_headers );
+
+            _debug("SENDING HEADERS:$/$hdr");
 
             $self->write( $hdr );
 
@@ -156,7 +193,7 @@ sub run {
 
                 my $hdrs_txt = $read_obj->read( $idx + 2 * length(CRLF) );
 
-                DEBUG && print "HEADERS:\n$hdrs_txt\n";
+                _debug("HEADERS:$/$hdrs_txt");
                 my $resp = HTTP::Response->parse($hdrs_txt);
 
                 Net::WebSocket::HTTP_R::handshake_consume_response(
@@ -165,10 +202,38 @@ sub run {
                 );
 
                 if ( $deflate->ok_to_use() ) {
+                    _debug('permessage-deflate extension accepted.');
                     $deflate_data = $deflate->create_data_object();
                 }
 
                 $got_handshake = 1;
+
+                $stdin = IO::Events::Handle->new(
+                    owner => $loop,
+                    handle => \*STDIN,
+                    read => 1,
+                    on_read => sub {
+                        my ($self) = @_;
+
+                        my $frame = ( $deflate_data || $ept )->create_message(
+                            SEND_FRAME_TYPE(),
+                            $self->read(),
+                        );
+
+                        $handle->write($frame->to_bytes());
+                    },
+
+                    on_close => sub {
+                        $ept->shutdown( code => 'SUCCESS' ) if $ept;
+                        $handle->flush();
+
+                        $closed = 1;
+                    },
+
+                    on_error => sub {
+                        print STDERR "ERROR\n";
+                    },
+                );
             }
 
             $ept ||= Net::WebSocket::Endpoint::Client->new(
@@ -187,50 +252,10 @@ sub run {
                     $payload = $deflate_data->decompress($payload);
                 }
 
-                while (length $payload) {
-                    syswrite( \*STDOUT, substr( $payload, 0, 65536, q<> ) ) or die "write(STDOUT): $!";
-                }
+                $stdout->write($payload);
             }
 
             $timeout->start();
-        },
-    );
-
-    my $closed;
-
-    my $stdin = IO::Events::stdin->new(
-        owner => $loop,
-        read => 1,
-        on_read => sub {
-            my ($self) = @_;
-
-            my $frame;
-
-            if ($deflate_data) {
-                $frame = $deflate_data->create_message(
-                    SEND_FRAME_CLASS(),
-                    $self->read(),
-                );
-            }
-            else {
-                $frame = SEND_FRAME_CLASS()->new(
-                    payload => $self->read(),
-                    mask => Net::WebSocket::Mask::create(),
-                );
-            }
-
-            $handle->write($frame->to_bytes());
-        },
-
-        on_close => sub {
-            $ept->shutdown( code => 'SUCCESS' ) if $ept;
-            $handle->flush();
-
-            $closed = 1;
-        },
-
-        on_error => sub {
-            print STDERR "ERROR\n";
         },
     );
 
@@ -255,7 +280,7 @@ sub run {
 }
 
 sub _debug {
-    print STDERR "DEBUG: $_[0]$/" if DEBUG;
+    print STDERR "DEBUG: $_[0]$/" if $DEBUG;
 }
 
 1;
