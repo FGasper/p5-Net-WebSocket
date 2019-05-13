@@ -4,13 +4,13 @@ use strict;
 use warnings;
 
 use Test::More;
-use Test::NoWarnings;
+use Test::FailWarnings;
 use Test::Deep;
 use Test::Exception;
 
 use constant EXT_CLASS => 'Net::WebSocket::Handshake::Extension';
 
-plan tests => 1 + 15;
+plan tests => 15;
 
 use Net::WebSocket::PMCE::deflate::Server ();
 

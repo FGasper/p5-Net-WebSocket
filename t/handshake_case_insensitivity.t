@@ -4,10 +4,10 @@ use strict;
 use warnings;
 
 use Test::More;
-use Test::NoWarnings;
+use Test::FailWarnings;
 use Test::Exception;
 
-plan tests => 1 + 2;
+plan tests => 2;
 
 use HTTP::Request ();
 

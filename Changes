@@ -11,6 +11,7 @@ Revision history for Perl module Net::WebSocket
 - Add a test for close frames.
 - POD fixes (thank you, MANWAR!)
 - Improve wscat.pl demo script.
+- Change tests to use Test::FailWarnings rather than Test::NoWarnings
 
 0.20 Wed Apr 24 2019
 - Fix test that fails now that X::Tiny no longer uses Module::Load.

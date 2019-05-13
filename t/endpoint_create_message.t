@@ -4,9 +4,9 @@ use strict;
 use warnings;
 
 use Test::More;
-use Test::NoWarnings;
+use Test::FailWarnings;
 
-plan tests => 1 + 10;
+plan tests => 10;
 
 use Net::WebSocket::Endpoint::Server ();
 use Net::WebSocket::Endpoint::Client ();

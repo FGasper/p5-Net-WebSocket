@@ -4,9 +4,9 @@ use strict;
 use warnings;
 
 use Test::More;
-use Test::NoWarnings;
+use Test::FailWarnings;
 
-plan tests => 1 + 4;
+plan tests => 4;
 
 use Net::WebSocket::PMCE::deflate::Client ();
 

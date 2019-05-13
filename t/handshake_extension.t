@@ -3,9 +3,9 @@
 use Test::More;
 
 #We expect at least one warning in this test.
-#use Test::NoWarnings;
+#use Test::FailWarnings;
 
-plan tests => 0 + 3;
+plan tests => 3;
 
 use HTTP::Request ();
 

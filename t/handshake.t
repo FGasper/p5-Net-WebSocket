@@ -1,9 +1,9 @@
 #!/usr/bin/env perl
 
 use Test::More;
-use Test::NoWarnings;
+use Test::FailWarnings;
 
-plan tests => 1 + 2;
+plan tests => 2;
 
 use MIME::Base64 ();
 

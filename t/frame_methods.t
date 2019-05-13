@@ -1,9 +1,9 @@
 #!/usr/bin/env perl
 
 use Test::More;
-use Test::NoWarnings;
+use Test::FailWarnings;
 
-plan tests => 39 + 1;
+plan tests => 39;
 
 use Net::WebSocket::Frame::text ();
 

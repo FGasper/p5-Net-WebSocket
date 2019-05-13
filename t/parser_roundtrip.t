@@ -8,7 +8,7 @@ BEGIN {
 }
 
 use Test::More;
-use Test::NoWarnings;
+use Test::FailWarnings;
 
 use File::Temp ();
 use Module::Runtime ();
@@ -50,7 +50,7 @@ my @frames_to_test = (
 #}
 #----------------------------------------------------------------------
 
-plan tests => 1 + @frames_to_test;
+plan tests => 0 + @frames_to_test;
 
 for my $frame_t (@frames_to_test) {
     my $class = "Net::WebSocket::Frame::$frame_t->{'type'}";

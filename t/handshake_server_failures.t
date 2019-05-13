@@ -4,14 +4,14 @@ use strict;
 use warnings;
 
 use Test::More;
-use Test::NoWarnings;
+use Test::FailWarnings;
 use Test::Deep;
 use Test::Exception;
 
 use Net::WebSocket::Constants         ();
 use Net::WebSocket::Handshake::Server ();
 
-plan tests => 1 + 14;
+plan tests => 14;
 
 #----------------------------------------------------------------------
 

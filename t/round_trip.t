@@ -5,9 +5,9 @@ use warnings;
 use autodie;
 
 use Test::More;
-use Test::NoWarnings;
+use Test::FailWarnings;
 
-plan tests => 1 + 1;
+plan tests => 1;
 
 use File::Temp;
 

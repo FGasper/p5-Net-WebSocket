@@ -8,7 +8,7 @@ BEGIN {
 }
 
 use Test::More;
-use Test::NoWarnings;
+use Test::FailWarnings;
 use Test::Deep;
 
 use File::Slurp;
@@ -16,7 +16,7 @@ use File::Temp;
 
 use IO::Framed ();
 
-plan tests => 1 + 6;
+plan tests => 6;
 
 use Net::WebSocket::Endpoint::Server ();
 use Net::WebSocket::Parser ();

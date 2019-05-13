@@ -4,7 +4,7 @@ use strict;
 use warnings;
 
 use Test::More;
-use Test::NoWarnings;
+use Test::FailWarnings;
 use Test::Deep;
 use Test::Exception;
 
@@ -17,7 +17,7 @@ use Net::WebSocket::Frame::close     ();
 use Net::WebSocket::Parser           ();
 use Net::WebSocket::Endpoint::Server ();
 
-plan tests => 1 + 1;
+plan tests => 1;
 
 #----------------------------------------------------------------------
 

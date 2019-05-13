@@ -4,9 +4,9 @@ use Net::WebSocket::Constants ();
 use Net::WebSocket::Frame::close ();
 
 use Test::More;
-use Test::NoWarnings;
+use Test::FailWarnings;
 
-plan tests => 1 + 27;
+plan tests => 31;
 
 my $frame = Net::WebSocket::Frame::close->new();
 
@@ -80,5 +80,3 @@ while ( my ($k, $v) = each %{ Net::WebSocket::Constants::STATUS() } ) {
 
     is_deeply( \@w, [], 'empty code && undef reason -> no warnings' );
 }
-
-done_testing();

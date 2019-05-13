@@ -2,14 +2,14 @@ use strict;
 use warnings;
 
 use Test::More;
-use Test::NoWarnings;
+use Test::FailWarnings;
 use Test::Exception;
 
 my @invalid = (
     ( map { "ha${_}he" } qw~ ( ) < > @ ; : \ " / [ ] ? = { } ~ ),
 );
 
-plan tests => 1 + 5 + @invalid;
+plan tests => 5 + @invalid;
 
 use_ok( 'Net::WebSocket::HTTP' );
 

@@ -4,11 +4,11 @@ use strict;
 use warnings;
 
 use Test::More;
-use Test::NoWarnings;
+use Test::FailWarnings;
 
 use Time::HiRes ();
 
-plan tests => 1 + 1;
+plan tests => 1;
 
 use Net::WebSocket::PMCE::deflate::Data::Server ();
 
