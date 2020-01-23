@@ -178,12 +178,12 @@ sub get_next_frame {
     else {
         ($longs, $long) = ( 0, $len );
         $len_buf = q<>;
-    }
 
-    if ($max_length) {
-        if ($long > $max_length) {
-            $self->{'_too_long'} = 1;
-            return undef;
+        if ( $max_length && $long > $max_length ) {
+            die Net::WebSocket::X->create(
+                'ReceivedOversizedMessage',
+                "Frame ($long) exceeds message size limit ($max_length)",
+            );
         }
     }
 

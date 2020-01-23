@@ -13,6 +13,7 @@ demo/shell_server.pl
 demo/wscat.pl
 demo/wscat_the_hard_way.pl
 lib/Net/WebSocket.pm
+lib/Net/WebSocket/Arch.pm
 lib/Net/WebSocket/Base/ControlFrame.pm
 lib/Net/WebSocket/Base/DataFrame.pm
 lib/Net/WebSocket/Base/ReadString.pm
@@ -71,6 +72,7 @@ lib/Net/WebSocket/X/MissingHeaders.pm
 lib/Net/WebSocket/X/ReceivedBadControlFrame.pm
 lib/Net/WebSocket/X/ReceivedBadDataFrame.pm
 lib/Net/WebSocket/X/ReceivedClose.pm
+lib/Net/WebSocket/X/ReceivedOversizedMessage.pm
 lib/Net/WebSocket/X/UnfinishedStream.pm
 lib/Net/WebSocket/X/UnknownExtension.pm
 lib/Net/WebSocket/X/UnknownSubprotocol.pm
@@ -84,6 +86,7 @@ t/endpoint_bad_continuation.t
 t/endpoint_check_heartbeat.t
 t/endpoint_close.t
 t/endpoint_create_message.t
+t/endpoint_empty_close.t
 t/endpoint_missing_continuation.t
 t/endpoint_pong_reset.t
 t/fragmented_binary.t
@@ -95,6 +98,7 @@ t/handshake_extension.t
 t/handshake_server_failures.t
 t/handshake_subprotocols.t
 t/message_methods.t
+t/message_size_limit.t
 t/parse_message.t
 t/parse_message_close.t
 t/parser_roundtrip.t
