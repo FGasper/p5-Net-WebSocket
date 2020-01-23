@@ -8,6 +8,7 @@ BEGIN {
 }
 
 use Test::More;
+use Test::Deep;
 use Test::FailWarnings;
 use Test::Exception;
 
@@ -48,7 +49,7 @@ sub _test {
 
     like(
         "$@",
-        qr<$size>,
+        qr<$limit>,
         "$label: message size limit is included",
     );
 
@@ -57,6 +58,31 @@ sub _test {
         qr<$size>,
         "$label: actual size of the message is included",
     );
+
+    #----------------------------------------------------------------------
+
+    sysseek $out_fh, 0, 0;
+    my $io2 = IO::Framed::Read->new($out_fh);
+    my $parser2 = Net::WebSocket::Parser->new( $io2 );
+
+    my $frame = $parser2->get_next_frame();
+
+    cmp_deeply(
+        $frame,
+        all(
+            Isa('Net::WebSocket::Frame::close'),
+            listmethods(
+                get_code_and_reason => [
+                    Net::WebSocket::Constants::STATUS()->{'MESSAGE_TOO_BIG'},
+                    all(
+                        re( qr<$limit> ),
+                        re( qr<$size> ),
+                    ),
+                ],
+            ),
+        ),
+        'close frame sent',
+    ) or diag explain [ $frame->get_code_and_reason() ];
 }
 
 _test(
