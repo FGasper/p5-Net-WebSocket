@@ -21,6 +21,9 @@ Net::WebSocket::Endpoint::Server
 
         out => $out_fh,
 
+        # Defaults to 64 MiB.
+        max_receive_message_length => 2**10,
+
         #optional, # of pings to send before we send a close
         max_pings => 5,
 
@@ -69,6 +72,15 @@ Instantiate the class. Nothing is actually done here. Options are:
 
 =item * C<out> (required) - The endpoint’s output object. An
 instance of L<IO::Framed> or a compatible class.
+
+=item * C<max_receive_message_length> - The maximum message length that
+the parsing logic will allow. If any incoming frame or message exceeds
+this limit, the connection is closed (code: MESSAGE_TOO_BIG), and a
+L<Net::WebSocket::X::ReceivedOversizedMessage> instance is thrown.
+
+This defaults to 64 MiB (i.e., 67108864). You can disable the limit
+by setting this value to 0; however, you shouldn’t do this because it
+allows a nefarious peer to fill up the parser buffer.
 
 =item * C<max_pings> (optional) - The maximum # of pings to send before
 we send a C<close> frame (which ends the session).

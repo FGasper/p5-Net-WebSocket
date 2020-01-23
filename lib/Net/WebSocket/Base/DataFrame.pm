@@ -7,6 +7,8 @@ use parent qw(
     Net::WebSocket::Frame
 );
 
+use Net::WebSocket::Arch ();
+
 use constant {
     is_control => 0,
     _MAX_32_BIT_LENGTH => 0xffffffff,
@@ -15,7 +17,7 @@ use constant {
 #accessed from tests
 our $_can_pack_Q;
 BEGIN {
-    $_can_pack_Q = eval { pack 'Q', 0 };
+    $_can_pack_Q = Net::WebSocket::Arch::CAN_PACK_64;
 }
 
 my $length;

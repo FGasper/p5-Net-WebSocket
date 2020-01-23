@@ -86,6 +86,7 @@ use warnings;
 
 use Module::Runtime ();
 
+use Net::WebSocket::Arch ();
 use Net::WebSocket::Constants ();
 use Net::WebSocket::X ();
 
@@ -97,6 +98,8 @@ use constant {
     OPCODE_CLASS_9 => 'Net::WebSocket::Frame::ping',
     OPCODE_CLASS_10 => 'Net::WebSocket::Frame::pong',
 };
+
+use constant _LONG_TMPL_PACK => Net::WebSocket::Arch::CAN_PACK_64 ? 'Q>' : 'x4 N';
 
 sub new {
     my ($class, $reader) = @_;
@@ -113,10 +116,10 @@ sub new {
 
 #Create these out here so that we don’t create/destroy them on each frame.
 #As long as we don’t access them prior to writing to them this is fine.
-my ($oct1, $oct2, $len, $mask_size, $len_len, $longs, $long);
+my ($oct1, $oct2, $len, $mask_size, $len_len, $longs, $long, $max_length);
 
 sub get_next_frame {
-    my ($self) = @_;
+    (my $self, $max_length) = @_;
 
     local $@;
 
@@ -149,16 +152,39 @@ sub get_next_frame {
 
         if ($len_len == 2) {
             ($longs, $long) = ( 0, unpack('n', $len_buf) );
+
+            if ( $max_length && $long > $max_length ) {
+                die Net::WebSocket::X->create(
+                    'ReceivedOversizedMessage',
+                    "Frame ($long) exceeds message size limit ($max_length)",
+                );
+            }
         }
         else {
-
             #Do it this way to support 32-bit systems.
             ($longs, $long) = ( unpack('NN', $len_buf) );
+
+            if ($max_length) {
+                if ($len_buf gt pack( _LONG_TMPL_PACK, $max_length )) {
+
+                    die Net::WebSocket::X->create(
+                        'ReceivedOversizedMessage',
+                        "Frame ($longs << 32, + $long) exceeds message size limit ($max_length)",
+                    );
+                }
+            }
         }
     }
     else {
         ($longs, $long) = ( 0, $len );
         $len_buf = q<>;
+    }
+
+    if ($max_length) {
+        if ($long > $max_length) {
+            $self->{'_too_long'} = 1;
+            return undef;
+        }
     }
 
     if ($mask_size) {

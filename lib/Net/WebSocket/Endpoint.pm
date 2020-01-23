@@ -25,7 +25,10 @@ use Net::WebSocket::Message ();
 use Net::WebSocket::PingStore ();
 use Net::WebSocket::X ();
 
-use constant DEFAULT_MAX_PINGS => 3;
+use constant {
+    DEFAULT_MAX_PINGS => 3,
+    DEFAULT_MAX_RECV_MSG_LEN => 64 * 1024 * 1024,
+};
 
 sub new {
     my ($class, %opts) = @_;
@@ -49,20 +52,22 @@ sub new {
             $self->_handle_control_frame(shift);
         },
 
-        on_protocol_error => sub {
-            ( undef, my $msg ) = @_;
+        on_error => sub {
+            ( my $code, undef, my $msg ) = @_;
 
-            #For now … there may be some multiplexing extension
-            #that allows some other behavior down the line,
-            #but let’s enforce standard protocol for now.
+            # There may be some multiplexing extension
+            # that allows some other behavior down the line,
+            # but let’s enforce standard protocol for now.
             my $err_frame = Net::WebSocket::Frame::close->new(
-                code => 'PROTOCOL_ERROR',
+                code => $code,
                 reason => $msg,
                 $self->FRAME_MASK_ARGS(),
             );
 
             $self->_write_frame($err_frame);
         },
+
+        max_message_length => $opts{'max_receive_message_length'} || DEFAULT_MAX_RECV_MSG_LEN(),
     );
 
     $self = {
@@ -89,7 +94,29 @@ sub get_next_message {
 
     $self->_verify_not_closed();
 
-    return $self->{'_defragger'}->get_next_message();
+    my $msg;
+
+    my $err = $@;
+
+    eval { $msg = $self->{'_defragger'}->get_next_message(); 1 } or do {
+        my $err = $@;
+        if ( eval { $err->isa('Net::WebSocket::X::ReceivedOversizedMessage') } ) {
+            my $err_frame = Net::WebSocket::Frame::close->new(
+                code => 'MESSAGE_TOO_BIG',
+                reason => $err->get_message(),
+                $self->FRAME_MASK_ARGS(),
+            );
+
+            $self->_write_frame($err_frame);
+        }
+
+        $@ = $err;
+        die;
+    };
+
+    $@ = $err;
+
+    return $msg;
 }
 
 sub create_message {

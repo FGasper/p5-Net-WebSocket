@@ -20,6 +20,7 @@ Net::WebSocket::Frame
     $frame->get_fin();
     $frame->get_mask_bytes();
     $frame->get_payload();
+    $frame->get_payload_length();
 
     $frame->set_rsv();
     $frame->get_rsv();
@@ -194,6 +195,8 @@ sub get_payload {
 
     return $pl;
 }
+
+sub get_payload_length { length ${ $_[0]->[ PAYLOAD ] } }
 
 #For sending over the wire
 sub to_bytes {

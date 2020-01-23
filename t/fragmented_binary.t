@@ -50,8 +50,7 @@ open my $pre_ws_fh, '<', $path;
 my $io = IO::Framed::Read->new($pre_ws_fh);
 my $parser = Net::WebSocket::Parser->new( $io );
 
-open my $out_fh, '>', \do { my $v = q<> };
-my $io_out = IO::Framed::Write->new($out_fh);
+my $io_out = IO::Framed::Write->new(\*STDERR);
 
 my $ept = Net::WebSocket::Endpoint::Client->new(
     parser => $parser,

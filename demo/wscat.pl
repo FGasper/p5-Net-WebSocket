@@ -33,7 +33,7 @@ use constant {
     SEND_FRAME_TYPE => 'binary',
 };
 
-my $DEBUG;
+my $DEBUG = 1;
 
 #No PIPE
 use constant ERROR_SIGS => qw( INT HUP QUIT ABRT USR1 USR2 SEGV ALRM TERM );
