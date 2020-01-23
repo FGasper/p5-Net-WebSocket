@@ -121,8 +121,6 @@ my ($oct1, $oct2, $len, $mask_size, $len_len, $longs, $long, $max_length);
 sub get_next_frame {
     (my $self, $max_length) = @_;
 
-    local $@;
-
     #It is really, really inconvenient that Perl has no “or” operator
     #that considers q<> falsey but '0' truthy. :-/
     #That aside, if indeed all we read is '0', then we know that’s not
@@ -166,7 +164,6 @@ sub get_next_frame {
 
             if ($max_length) {
                 if ($len_buf gt pack( _LONG_TMPL_PACK, $max_length )) {
-
                     die Net::WebSocket::X->create(
                         'ReceivedOversizedMessage',
                         "Frame ($longs << 32, + $long) exceeds message size limit ($max_length)",

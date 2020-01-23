@@ -1,8 +1,12 @@
 Revision history for Perl module Net::WebSocket
 
 0.22
-- BREAKING CHANGE: A message-size maximum is now given by default to
-  reader/parser interfaces. The maximum defaults to 64 MiB.
+- BREAKING CHANGE: A message-size maximum is now enforced in
+  reader/parser interfaces. Failure to include such a maximum in prior
+  Net::WebSocket versions was a design flaw, and since this module is
+  still considered “beta”, the decision was made to change the interface.
+  That said, few applications should notice any difference, as 64 MiB is
+  quite a high limit.
 
 0.21 Fri May 24 2019
 - Supply missing “MockReader” module for demos.

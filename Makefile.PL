@@ -29,7 +29,7 @@ WriteMakefile1(
 
     PREREQ_PM    => {
         'parent'    => 0,
-        'X::Tiny'   => 0,
+        'X::Tiny'   => 0.02,
         'Module::Runtime'  => 0,
         'MIME::Base64' => 0,
         'Digest::SHA1' => 0,
