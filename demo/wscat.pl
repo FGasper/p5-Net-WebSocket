@@ -133,7 +133,6 @@ sub run {
     my $handshake;
 
     my $deflate = Net::WebSocket::PMCE::deflate::Client->new();
-    my $deflate_hsk = $deflate->get_handshake_object();
     my $deflate_data;
 
     my $stdout = IO::Events::Handle->new(
