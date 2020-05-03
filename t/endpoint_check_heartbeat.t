@@ -44,7 +44,7 @@ cmp_deeply(
     all(
         Isa('Net::WebSocket::Frame::ping'),
         methods(
-            get_payload => re( qr<0> ),
+            get_payload => re( qr<\#1> ),
         ),
     ),
     'check_heartbeat() sends 1st ping frame as expected',
@@ -60,7 +60,7 @@ cmp_deeply(
     all(
         Isa('Net::WebSocket::Frame::ping'),
         methods(
-            get_payload => re( qr<1> ),
+            get_payload => re( qr<\#2> ),
         ),
     ),
     'check_heartbeat() sends 2nd ping frame as expected',
@@ -76,7 +76,7 @@ cmp_deeply(
     all(
         Isa('Net::WebSocket::Frame::ping'),
         methods(
-            get_payload => re( qr<2> ),
+            get_payload => re( qr<\#3> ),
         ),
     ),
     'check_heartbeat() sends 3rd ping frame as expected',
