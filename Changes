@@ -1,8 +1,8 @@
 Revision history for Perl module Net::WebSocket
 
-0.22
+0.22 Wed June 24 2020
 - Respond to invalid close frames with PROTOCOL_ERROR close.
-- Tighten validation for close codes.
+- Tighten validation for close codes (reject 5000-9999).
 - Fix test reliability problem.
 
 0.21 Fri May 24 2019
