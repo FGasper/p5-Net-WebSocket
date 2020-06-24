@@ -229,6 +229,12 @@ sub _handle_control_frame {
         if (!$self->{'_sent_close_frame'}) {
             my ($code, $reason) = $frame->get_code_and_reason();
 
+            if ($code > 4999) {
+                my $reason_chunk = substr( $reason, 0, 50 );
+                $reason = "Invalid close code ($code, reason: $reason_chunk) received.";
+                $code = 'PROTOCOL_ERROR';
+            }
+
             $self->_close_with_frame(
                 Net::WebSocket::Frame::close->new(
                     code => $code,

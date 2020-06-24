@@ -127,13 +127,13 @@ sub new {
             if (!$num) {
                 $num = $code;
 
-                if ($num !~ m<\A[0-9]{4}\z> ) {
-                    die Net::WebSocket::X->create('BadArg', 'code', $num, 'Invalid WebSocket status code');
+                if ($num !~ m<\A[1-4][0-9]{3}\z> ) {
+                    die Net::WebSocket::X->create('BadArg', 'code', $num, "Invalid WebSocket status code ($num) given");
                 }
 
                 if ( !Net::WebSocket::Constants::status_code_to_name($num) ) {
                     if ( $num < 4000 || $num > 4999 ) {
-                        die Net::WebSocket::X->create('BadArg', 'code', $num, 'Disallowed WebSocket status code');
+                        die Net::WebSocket::X->create('BadArg', 'code', $num, "Disallowed WebSocket status code ($num) given");
                     }
                 }
             }

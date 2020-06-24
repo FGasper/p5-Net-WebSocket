@@ -1,6 +1,10 @@
 Revision history for Perl module Net::WebSocket
 
-0.21
+0.22
+- Respond to invalid close frames with PROTOCOL_ERROR close.
+- Tighten validation for close codes.
+
+0.21 Fri May 24 2019
 - Supply missing “MockReader” module for demos.
 - Suppress warning when empty “code” and “reason” are both given to
   Net::WebSocket::Frame::close constructor.
