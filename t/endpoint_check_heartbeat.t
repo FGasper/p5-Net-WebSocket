@@ -16,7 +16,7 @@ use IO::Framed ();
 use Net::WebSocket::Parser           ();
 use Net::WebSocket::Endpoint::Server ();
 
-plan tests => 9;
+plan tests => 10;
 
 #----------------------------------------------------------------------
 
@@ -37,7 +37,7 @@ my $ept = Net::WebSocket::Endpoint::Server->new(
 $ept->check_heartbeat();
 
 open my $re_in_fh, '<', $outfile;
-my $reparser = Net::WebSocket::Parser->new( IO::Framed->new($re_in_fh) );
+my $reparser = Net::WebSocket::Parser->new( IO::Framed->new($re_in_fh)->allow_empty_read() );
 my $frame = $reparser->get_next_frame();
 cmp_deeply(
     $frame,
@@ -105,6 +105,11 @@ cmp_deeply(
     ),
     'check_heartbeat() sends close() instead of 4th ping',
 );
+
+$infh->blocking(0);
+
+$frame = $reparser->get_next_frame();
+ok(!$frame, 'close is the last frame sent');
 
 for my $method ( qw( is_closed sent_close_frame ) ) {
     ok(

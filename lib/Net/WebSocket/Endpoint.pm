@@ -119,15 +119,16 @@ sub check_heartbeat {
             reason => "Unanswered ping(s): $ping_counter",
         );
     }
+    else {
+        my $ping_message = $self->{'_ping_store'}->add();
 
-    my $ping_message = $self->{'_ping_store'}->add();
+        my $ping = Net::WebSocket::Frame::ping->new(
+            payload => $ping_message,
+            $self->FRAME_MASK_ARGS(),
+        );
 
-    my $ping = Net::WebSocket::Frame::ping->new(
-        payload => $ping_message,
-        $self->FRAME_MASK_ARGS(),
-    );
-
-    $self->_write_frame($ping);
+        $self->_write_frame($ping);
+    }
 
     return;
 }

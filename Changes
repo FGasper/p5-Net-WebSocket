@@ -1,5 +1,8 @@
 Revision history for Perl module Net::WebSocket
 
+0.23
+- BUG FIX: We no longer send an extra ping after excess unanswered pings.
+
 0.22 Wed June 24 2020
 - Respond to invalid close frames with PROTOCOL_ERROR close.
 - Tighten validation for close codes (reject 5000-9999).
