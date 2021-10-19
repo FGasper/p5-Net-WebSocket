@@ -1,5 +1,8 @@
 Revision history for Perl module Net::WebSocket
 
+0.24
+- BUG FIX: We no longer warn if the peer closes without a close code.
+
 0.23 Mon Jun 21 2021
 - BUG FIX: We no longer send an extra ping after excess unanswered pings.
 
